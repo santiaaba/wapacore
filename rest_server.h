@@ -6,6 +6,9 @@
 #include "dictionary.h"
 #include "task.h"
 
+#ifndef REST_SERVER_H
+#define REST_SERVER_H
+
 #define PORT		8888
 #define POSTBUFFERSIZE  512
 #define MAXNAMESIZE     20
@@ -13,6 +16,12 @@
 #define GET		0
 #define POST		1
 #define DELETE		2
+
+struct connection_info_struct {
+        int connectiontype;
+        T_dictionary *data;
+        struct MHD_PostProcessor *postprocessor;
+};
 
 typedef struct t_r_server {
 	T_heap_task tasks_todo;
@@ -22,15 +31,8 @@ typedef struct t_r_server {
 	pthread_t do_task;
 	pthread_mutex_t mutex_heap_task;
 	pthread_mutex_t mutex_bag_task;
-	pthread_mutex_t mutex_lists;
 	T_db *db;
 	} T_rest_server;
-
-struct connection_info_struct {
-	int connectiontype;
-	T_dictionary *data;
-	struct MHD_PostProcessor *postprocessor;
-};
 
 /* Variables externas que se encuentran en controller.c,
  * el cual utiliza esta libreria. Guarda que estas variables
@@ -41,3 +43,8 @@ void rest_server_init(T_rest_server *r, T_db *db);
 void rest_server_add_task(T_rest_server *r, T_task *j);
 void rest_server_lock(T_rest_server *r);
 void rest_server_unlock(T_rest_server *r);
+void rest_server_error(T_task **task, char *result, int *ok);
+void rest_server_lock(T_rest_server *r);
+void rest_server_unlock(T_rest_server *r);
+
+#endif

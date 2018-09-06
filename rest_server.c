@@ -1,25 +1,5 @@
 #include "rest_server.h"
 
-/* La variable server_rest debe ser global */
-
-int check_data_mod_site(T_dictionary *data, char *message){
-	/* Verifica que los datos sean correctos. Si no lo
- 	   son retorna un mensaje en su segundo parametro */
-	return 1;
-}
-
-int check_data_add_site(T_dictionary *data, char *message){
-	/* Verifica que los datos sean correctos. Si no lo
- 	   son retorna un mensaje en su segundo parametro */
-	return 1;
-}
-
-int check_data_del_site(T_dictionary *data, char *message){
-	/* Verifica que los datos sean correctos. Si no lo
- 	   son retorna un mensaje en su segundo parametro */
-	return 1;
-}
-
 void rest_server_add_task(T_rest_server *r, T_task *j){
 	printf("Agregamos el JOB: %s a la lista\n",task_get_id(j));
 
@@ -30,6 +10,13 @@ void rest_server_add_task(T_rest_server *r, T_task *j){
 		//heap_task_print(&(r->tasks_todo));
 	pthread_mutex_unlock(&(r->mutex_heap_task));
 
+}
+
+void rest_server_error(T_task **task, char *result, int *ok){
+	task_destroy(task);
+	printf("Error en la URL\n");
+	result = "{\"task\":\"\",\"stauts\":\"ERROR\"}";
+	ok=0;
 }
 
 void *rest_server_do_task(void *param){
@@ -43,9 +30,7 @@ void *rest_server_do_task(void *param){
 			printf("DO_TASK - %s\n",task_get_id(task));
 		pthread_mutex_unlock(&(r->mutex_heap_task));
 		if(task != NULL){
-			pthread_mutex_lock(&(r->mutex_lists));
-				task_run(task,r->db);
-			pthread_mutex_unlock(&(r->mutex_lists));
+			task_run(task,r->db);
 			pthread_mutex_lock(&(r->mutex_bag_task));
 				printf("BAG_TASK - %s\n",task_get_id(task));
 				bag_task_add(&(r->tasks_done),task);
@@ -53,6 +38,166 @@ void *rest_server_do_task(void *param){
 			pthread_mutex_unlock(&(r->mutex_bag_task));
 		}
 	}
+}
+
+static int handle_POST(struct MHD_Connection *connection,
+			const char *url,
+			struct connection_info_struct *con_info){
+	int pos=1;
+	int ok=1;
+	char value[100];
+	char *result = (char *)malloc(TASKRESULT_SIZE);
+        unsigned int size_result = TASKRESULT_SIZE;
+	T_task *task;
+	T_taskid *taskid;
+
+	/* El token de momento lo inventamos
+ 	   pero deberia venir en el header del mensaje */
+	T_tasktoken token;
+	random_token(token);
+
+	/* Le pasamos el puntero del diccionario del
+ 	   parametro con_info a la variable task. OJO
+	   que entonces ya no es responsabilidad del metodo
+	   eliminar la estructura de diccionario. Sino que pasa
+	   a ser responsabilidad del task. */
+
+	task = (T_task *)malloc(sizeof(T_task));
+	parce_data((char *)url,'/',&pos,value);
+
+	/* PARA LOS PLANES */
+	if(0 == strcmp("plans",value)){
+		parce_data((char *)url,'/',&pos,value);
+		if(strlen(value)>0){
+			rest_server_error(&task,result,&ok);
+		} else {
+			printf("alta de un plan\n");
+			if(check_data_add_plan(con_info->data,result)){
+				task_init(task,&token,T_ADD_PLAN,con_info->data);
+			}
+		}
+	/* PARA LOS USUARIOS */
+	} else if(0 == strcmp("users",value)){
+		parce_data((char *)url,'/',&pos,value);
+		if(strlen(value)>0){
+			rest_server_error(&task,result,&ok);
+		} else {
+			printf("alta de un usuario\n");
+			if(check_data_add_user(con_info->data,result)){
+			} else {
+				task_init(task,&token,T_ADD_USER,con_info->data);
+			}
+		}
+	/* PARA LAS SUSCRIPCIONES */
+	} else if(0 == strcmp("suscriptions",value)){
+		parce_data((char *)url,'/',&pos,value);
+		if(strlen(value)>0){
+			rest_server_error(&task,result,&ok);
+		} else {
+			printf("alta de una suscripsion\n");
+			if(check_data_add_user(con_info->data,result)){
+			} else {
+				task_init(task,&token,T_ADD_SUSCRIP,con_info->data);
+			}
+		}
+	/* CUALQUIER OTRA COSA. ERROR */
+	} else {
+		rest_server_error(&task,result,&ok);
+	}
+
+	if(ok){
+		rest_server_add_task(&rest_server,task);
+		sprintf(result,"{\"task\":\"%s\",\"status\":\"TODO\"}",task_get_id(task));
+	}
+	send_page (connection,result);
+	return ok;
+}
+
+static int handle_GET(struct MHD_Connection *connection, const char *url){
+	char value[100];
+	int pos=1;
+	int userid;
+	T_dictionary *data;
+	char *result = (char *)malloc(TASKRESULT_SIZE);
+	unsigned int size_result = TASKRESULT_SIZE;
+	T_task *task;
+	T_taskid *taskid;
+	int ok=1;	// Resultado a retornar la funcion
+	int isTaskStatus =0;	// Cualquier GET excepto el que solisita el estadod e un task se encola.
+
+	/* El token de momento lo inventamos
+ 	   pero deberia venir en el header del mensaje */
+	T_tasktoken token;
+	random_token(token);
+
+	task = (T_task *)malloc(sizeof(T_task));
+	parce_data((char *)url,'/',&pos,value);
+
+	/* PARA LOS PLANES */
+	if(0 == strcmp("plans",value)){
+		parce_data((char *)url,'/',&pos,value);
+		if(strlen(value)> 0){
+			printf("Info de un plan\n");
+			data = malloc(sizeof(T_dictionary));
+			dictionary_init(data);
+			dictionary_add(data,"id",value);
+			task_init(task,&token,T_GET_PLAN,data);
+		} else {
+			printf("listado de planes\n");
+			task_init(task,&token,T_GET_PLANS,NULL);
+		}
+
+	/* PARA LOS USUARIOS */
+	} else if(0 == strcmp("users",value)) {
+		parce_data((char *)url,'/',&pos,value);
+		if(strlen(value)>0){
+			userid = atoi(value);
+			parce_data((char *)url,'/',&pos,value);
+			/* PARA LAS SUSCRIPCIONES DEL USUARIO */
+			if(0 == strcmp("suscriptions",value)) {
+				parce_data((char *)url,'/',&pos,value);
+				if(strlen(value)>0){
+					printf("info de suscripcion\n");
+					data = malloc(sizeof(T_dictionary));
+					dictionary_init(data);
+					dictionary_add(data,"userid",userid);
+					dictionary_add(data,"suscripid",value);
+					task_init(task,&token,T_GET_SUSCRIPTION,data);
+				} else {
+					printf("listado de suscripciones del usuario\n");
+					task_init(task,&token,T_GET_SUSCRIPTIONS,NULL);
+				}
+			} else {
+				rest_server_error(&task,result,&ok);
+			}
+		} else {
+			printf("listado de usuarios\n");
+			task_init(task,&token,T_GET_PLANS,NULL);
+		}
+
+	/* PARA LOS TASK */
+	} else if(0 == strcmp("task",value)) {
+		/* Se solicita info de un task */
+		isTaskStatus =1;
+		free(task);
+		parce_data((char *)url,'/',&pos,value);
+		if(strlen(value)>0){
+			printf("Nos solicitan cómo termino la tarea con id: %s\n",value);
+			rest_server_get_task(&rest_server,(T_taskid *)value,&result,&size_result);
+		} else {
+			strcpy(result,"{task incorrecto}");
+		}
+
+	/* PARA CUALQUIER OTRA COSA */
+	} else {
+		rest_server_error(&task,result,&ok);
+	}
+	if(!isTaskStatus && ok){
+		sprintf(result,"{\"task\":\"%s\",\"status\":\"TODO\"}",task_get_id(task));
+		rest_server_add_task(&rest_server,task);
+	}
+	send_page (connection, result);
+	return ok;
 }
 
 void rest_server_get_task(T_rest_server *r, T_taskid *taskid, char **result, unsigned int *size){
@@ -106,146 +251,6 @@ static int send_page(struct MHD_Connection *connection, const char *page){
 	MHD_destroy_response (response);
 
 	return ret;
-}
-
-static int handle_POST(struct MHD_Connection *connection,
-			const char *url,
-			struct connection_info_struct *con_info){
-	int pos=1;
-	int ok=1;
-	char value[100];
-	char *result = (char *)malloc(TASKRESULT_SIZE);
-        unsigned int size_result = TASKRESULT_SIZE;
-	T_task *task;
-	T_taskid *taskid;
-
-	/* El token de momento lo inventamos
- 	   pero deberia venir en el header del mensaje */
-	T_tasktoken token;
-	random_token(token);
-
-	/* Le pasamos el puntero del diccionario del
- 	   parametro con_info a la variable task. OJO
-	   que entonces ya no es responsabilidad del metodo
-	   eliminar la estructura de diccionario. Sino que pasa
-	   a ser responsabilidad del task. */
-
-	task = (T_task *)malloc(sizeof(T_task));
-	parce_data((char *)url,'/',&pos,value);
-	if(0 == strcmp("sites",value)){
-		/* Acciones POST sobre un sitio */
-		parce_data((char *)url,'/',&pos,value);
-		if(strlen(value)>0){
-			printf("modif de un sitio\n");
-			/* Modificacion de un sitio */
-			if(check_data_mod_site(con_info->data,result)){
-				task_init(task,&token,T_MOD_SITE,con_info->data);
-			}
-		} else {
-			printf("alta de un sitio\n");
-			/* Es el alta de un sitio */
-			if(check_data_add_site(con_info->data,result)){
-				task_init(task,&token,T_ADD_SITE,con_info->data);
-			}
-		}
-	} else if(0 == strcmp("workers",value)){
-		/* Acciones POST sobre un worker. A IMPLEMENTAR */
-	} else {
-		/* ERROR de protocolo. URL mal confeccionada */
-		task_destroy(&task);
-		printf("Error en la URL\n");
-		result = "{\"task\":\"\",\"stauts\":\"ERROR\"}";
-		ok=0;
-	}
-	if(ok){
-		rest_server_add_task(&rest_server,task);
-		sprintf(result,"{\"task\":\"%s\",\"status\":\"TODO\"}",task_get_id(task));
-	}
-	send_page (connection,result);
-	return ok;
-}
-
-static int handle_GET(struct MHD_Connection *connection, const char *url){
-	char value[100];
-	int pos=1;
-	T_dictionary *data;
-	char *result = (char *)malloc(TASKRESULT_SIZE);
-	unsigned int size_result = TASKRESULT_SIZE;
-	T_task *task;
-	T_taskid *taskid;
-	int ok=1;	// Resultado a retornar la funcion
-	int isTaskStatus =0;
-
-	/* El token de momento lo inventamos
- 	   pero deberia venir en el header del mensaje */
-	T_tasktoken token;
-	random_token(token);
-
-	task = (T_task *)malloc(sizeof(T_task));
-	parce_data((char *)url,'/',&pos,value);
-	printf("Llego\n");
-	if(0 == strcmp("sites",value)){
-		parce_data((char *)url,'/',&pos,value);
-		if(strlen(value)>0){
-			/* Se solicita info de un sitio */
-			printf("Info de un sitio\n");
-			data = malloc(sizeof(T_dictionary));
-			dictionary_init(data);
-			dictionary_add(data,"id",value);
-			task_init(task,&token,T_GET_SITE,data);
-		} else {
-			/* Se solicita listado de sitios */
-			printf("Entramos\n");
-			task_init(task,&token,T_GET_SITES,NULL);
-		}
-	} else if(0 == strcmp("workers",value)) {
-		parce_data((char *)url,'/',&pos,value);
-		if(strlen(value)>0){
-			/* Son acciones sobre un worker */
-			data = malloc(sizeof(T_dictionary));
-			dictionary_init(data);
-			dictionary_add(data,"id",value);
-			parce_data((char *)url,'/',&pos,value);
-			if(strcmp(value,"stop") == 0){
-				/* Se solicita pausar un sitio */
-				task_init(task,&token,T_STOP_WORKER,data);
-			} else if(strcmp(value,"start") == 0){
-				/* Se solicita arrancar un sitio */
-				task_init(task,&token,T_START_WORKER,data);
-			} else if(strcmp(value,"") == 0){
-				/* Se solicita info de un worker */
-				task_init(task,&token,T_GET_WORKER,data);
-			} else {
-				/* ERROR de REST */
-			}
-		} else {
-			/* Se solicita listado de workers */
-			task_init(task,&token,T_GET_WORKERS,NULL);
-		}
-
-	} else if(0 == strcmp("task",value)) {
-		/* Se solicita info de un task */
-		isTaskStatus =1;
-		free(task);
-		parce_data((char *)url,'/',&pos,value);
-		if(strlen(value)>0){
-			printf("Nos solicitan cómo termino la tarea con id: %s\n",value);
-			rest_server_get_task(&rest_server,(T_taskid *)value,&result,&size_result);
-		} else {
-			strcpy(result,"{task incorrecto}");
-		}
-	} else {
-		/* ERROR de protocolo. URL mal confeccionada */
-		printf("Error en la URL\n");
-		result = "{\"task\":\"\",\"stauts\":\"ERROR\"}";
-		ok=0;
-	}
-	if(!isTaskStatus && ok){
-		sprintf(result,"{\"task\":\"%s\",\"status\":\"TODO\"}",task_get_id(task));
-		rest_server_add_task(&rest_server,task);
-	}
-	send_page (connection, result);
-	return ok;
 }
 
 static int iterate_post (void *coninfo_cls, enum MHD_ValueKind kind, const char *key,
@@ -349,12 +354,3 @@ void rest_server_init(T_rest_server *r, T_db *db){
 	}
 }
 
-void rest_server_lock(T_rest_server *r){
-        /* seccion critica manejo de listas */
-        pthread_mutex_lock(&(r->mutex_lists));
-}
-
-void rest_server_unlock(T_rest_server *r){
-        /* seccion critica manejo de listas */
-        pthread_mutex_unlock(&(r->mutex_lists));
-}
