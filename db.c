@@ -33,3 +33,27 @@ void db_user_show(T_db *db, MYSQL_RES **result,char *id){
 	mysql_query(db->con,sql);
 	*result = mysql_store_result(db->con);
 }
+
+int db_user_add(T_db *db, char *name, char *pass, char *email, char *message){
+	
+	MYSQL_RES *result;
+	MYSQL_ROW row;
+	char sql[100];
+	
+	// Verificamos que el usuario no exista ya */
+	sprintf(sql,"select count(name) from user where name='%s'",name);
+	mysql_query(db->con,sql);
+	result = mysql_store_result(db->con);
+	row = mysql_fetch_row(result);
+	if(atoi(row[0]) >  0){
+		strcpy(message,"Usuario ya existe");
+		return 0;
+	}
+	sprintf(sql,"insert into user(name,pass,email) values ('%s','%s','%s')",
+		name,pass,email);
+	if(0 != mysql_query(db->con,sql)){
+		return 0;
+		strcpy(message,"Error al crear el usuario en la base de datos");
+	}
+	return 1;
+}

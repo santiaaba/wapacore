@@ -52,12 +52,15 @@ void task_init(T_task *t, T_tasktoken *token, T_task_type type, T_dictionary *da
 	strcpy(t->result,"");
 }
 
+char *task_get_id(T_task *t){
+	return t->id;
+}
+
 void task_destroy(T_task **t){
 	printf("Entramos a eliminar el task\n");
 	if((*t)->data != NULL){
 		printf("Eliminamos el diccionario\n");
 		dictionary_destroy(&((*t)->data));
-		//free((*t)->data);
 	}
 	printf("liberamos el resultado\n");
 	free((*t)->result);
@@ -65,17 +68,25 @@ void task_destroy(T_task **t){
 	free(*t);
 }
 
-
 char *task_get_result(T_task *t){
 	return t->result;
 }
 
-char *task_get_id(T_task *t){
-	return t->id;
+T_task_status task_get_status(T_task *t){
+	return t->status;
 }
 
-T_tasktoken *tob_get_token(T_task *t){
+T_tasktoken *task_get_token(T_task *t){
 	return t->token;
+}
+
+void task_print_status(T_task *t, char *s){
+	switch(t->status){
+	case T_WAITING: strcpy(s,"waiting"); break;
+	case T_RUNNING: strcpy(s,"running"); break;
+	case T_DONE_OK: strcpy(s,"done_ok"); break;
+	case T_DONE_ERROR: strcpy(s,"done_error"); break;
+	}
 }
 
 char *tob_get_id(T_task *t){
@@ -87,28 +98,47 @@ int task_user_list(T_task *t, T_db *db){
 
 	db_user_list(db,&result);
 	json_user_list(&(t->result),&(t->result_size),result);
+	t->status = T_DONE_OK;
 }
 
 int task_user_show(T_task *t, T_db *db){
 	MYSQL_RES *result;
 	char *id;
 
-	id = dictionary_get(t->data,"id");
+	printf("TASK: show user\n");
+	id = dictionary_get(t->data,"userid");
 	db_user_show(db,&result,id);
-	json_user_show(&(t->result),&(t->result_size),result);
+	if(json_user_show(&(t->result),&(t->result_size),result)){
+		t->status = T_DONE_OK;
+	} else {
+		t->status = T_DONE_ERROR;
+	}
+}
+
+int task_user_add(T_task *t, T_db *db){
+	char *name = dictionary_get(t->data,"name");
+	char *pass = dictionary_get(t->data,"pass");
+	char *email = dictionary_get(t->data,"email");
+	char result[100];
+
+	if(db_user_add(db,name,pass,email,result)){
+		strcpy(t->result,"usuario agregado correctamente");
+		t->status = T_DONE_OK;
+	} else {
+		strcpy(t->result,result);
+		t->status = T_DONE_ERROR;
+	}
 }
 
 void task_run(T_task *t, T_db *db){
 	/* Ejecuta el JOB */
-	printf("paso\n");
 	t->status = T_RUNNING;
-	printf("paso\n");
 
 	switch(t->type){
 		/* USERS */
 		case T_USER_LIST: task_user_list(t,db); break;
 		case T_USER_SHOW: task_user_show(t,db); break;
-		case T_USER_ADD: break;
+		case T_USER_ADD: task_user_add(t,db); break;
 		case T_USER_MOD: break;
 		case T_USER_DEL: break;
 
@@ -119,7 +149,6 @@ void task_run(T_task *t, T_db *db){
 		case T_SUSC_MOD: break;
 		case T_SUSC_DEL: break;
 	}
-	t->status = T_DONE;
 }
 
 /*****************************
@@ -171,14 +200,16 @@ unsigned int heap_task_size(T_heap_task *h){
 	return h->size;
 }
 
-int heap_task_exist(T_heap_task *h, T_taskid id){
-	/* indica si el trabajo existe en la cola */
+T_task *heap_task_exist(T_heap_task *h, T_taskid id){
+	/* indica si el trabajo existe en la cola y retorna
+ 	 * el puntero al mismo */
 	heap_t_node *aux;
-	int exist=0;
+	T_task *exist = NULL;
 	
 	aux = h->first;
-	while(!exist && aux!= NULL){
-		exist = (strcmp(task_get_id(aux->data),id) == 0);
+	while(exist == NULL && aux!= NULL){
+		if(strcmp(task_get_id(aux->data),id) == 0)
+			exist = aux->data;
 		aux = aux->next;
 	}
 	return exist;

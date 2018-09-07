@@ -4,6 +4,19 @@ int check_data_plan_add(T_dictionary *data, char *result){
 	return 1;
 }
 int check_data_user_add(T_dictionary *data, char *result){
+	/* Verificamos existencia parametros */
+	if(dictionary_get(data,"name") == NULL){
+		strcpy(result,"Falta parametro name");
+		return 0;
+	}
+	if(dictionary_get(data,"pass") == NULL){
+		strcpy(result,"Falta parametro pass");
+		return 0;
+	}
+	if(dictionary_get(data,"email") == NULL){
+		strcpy(result,"Falta parametro email");
+		return 0;
+	}
 	return 1;
 }
 int check_data_susc_add(T_dictionary *data, char *result){
@@ -22,10 +35,8 @@ void rest_server_add_task(T_rest_server *r, T_task *j){
 
 }
 
-void rest_server_error(T_task **task, char *result, int *ok){
-	task_destroy(task);
-	printf("Error en la URL\n");
-	result = "{\"task\":\"\",\"stauts\":\"ERROR\"}";
+void rest_server_error(char *result, int *ok){
+	strcpy(result,"{\'task\':\'\',\'stauts\':\'ERROR\',\'data\'=\'api call invalid\'}");
 	*ok=0;
 }
 
@@ -65,42 +76,43 @@ static int send_page(struct MHD_Connection *connection, const char *page){
 	return ret;
 }
 
-void rest_server_get_task(T_rest_server *r, T_taskid *taskid, char **result, unsigned int *size){
-	T_task *task;
+void rest_server_get_task(T_rest_server *r, T_taskid *taskid, char **message, unsigned int *size){
+	T_task *task = NULL;
+	char status[30];
 	unsigned int total_size;
 
 	pthread_mutex_lock(&(r->mutex_bag_task));
 	pthread_mutex_lock(&(r->mutex_heap_task));
-		printf("Buscadno TASK ID: %s\n",taskid);
-		/* Buscamos en la bolsa de tareas finalizadas */
-		bag_task_print(&(r->tasks_done));
-		task = bag_task_pop(&(r->tasks_done),taskid);
-		if(NULL == task){
-			printf("NO encontramos el task\n");
-			/* Verificamos si esta en la cola de tareas pendientes */
-			if(heap_task_exist(&(r->tasks_todo),(char *)taskid)){
-				/* Tarea existe y esta en espera */
-				sprintf(*result,"{\"taskid\":\"%s\",\"status\":\"WHAIT\"}",taskid);
-			} else {
-				/* Tarea no existe mas */
-				sprintf(*result,"{\"taskid\":\"%s\",\"status\":\"INEXIST\"}",taskid);
-			}
-		} else {
-			printf("Encontramos el task\n");
-			/* Tarea existe y ha finalizado */
-			sprintf(*result,"{\"taskid\":\"%s\",\"status\":\"DONE\",\"result\":\"",taskid);
-			total_size = (strlen(*result) + strlen(task_get_result(task)));
-			if(total_size > *size){
-				*result = (char *)realloc(*result,total_size + 10);
-				*size = total_size + 10;
-			}
-			strcat(*result,task_get_result(task));
-			strcat(*result,"\"}");
-			/* Eliminamos el task */
+
+	printf("Buscadno TASK ID: %s\n",taskid);
+	/* Buscamos en la bolsa de tareas finalizadas. Si la encontramos,
+ 	   bag_task_print la quita de la estructura bag. */
+	bag_task_print(&(r->tasks_done));
+	task = bag_task_pop(&(r->tasks_done),taskid);
+	printf("PASO %p\n",task);
+	if(task == NULL){
+		printf("No esta en la bolsa de terminados. La buscamos en la cola de pendientes\n");
+		/* Buscamos entonces en la cola de pendientes. En este caso
+ 		   se retorna una copia del task pero no se quita de la cola */
+		task = heap_task_exist(&(r->tasks_todo),(char *)taskid);
+		printf("PASO 2 %p\n",task);
+	}
+	if(task == NULL){
+		printf("Tampoco esta en la cola de pendientes\n");
+		sprintf(*message,"{'taskid':'%s','status':'INEXIST'}",taskid);
+	} else {
+		/* Armamos en message el resultado de la terea */
+		task_print_status(task,status);
+		json_task(status,task_get_id(task),task_get_result(task),message,size);
+
+		/* Destruimos el task si esta ya finalizado */
+		if(task_get_status(task) > T_RUNNING){
 			printf("ELIMINAMOS EL TASK\n");
 			task_destroy(&task);
 			printf("TASK ELIMINADO\n");
 		}
+	}
+
 	pthread_mutex_unlock(&(r->mutex_heap_task));
 	pthread_mutex_unlock(&(r->mutex_bag_task));
 }
@@ -134,45 +146,47 @@ static int handle_POST(struct MHD_Connection *connection,
 	if(0 == strcmp("plans",value)){
 		parce_data((char *)url,'/',&pos,value);
 		if(strlen(value)>0){
-			rest_server_error(&task,result,&ok);
+			ok=0;
+		
+			rest_server_error(result,&ok);
 		} else {
 			printf("alta de un plan\n");
-			if(check_data_plan_add(con_info->data,result)){
+			if(ok = check_data_plan_add(con_info->data,result))
 				task_init(task,&token,T_PLAN_ADD,con_info->data);
-			}
 		}
 	/* PARA LOS USUARIOS */
 	} else if(0 == strcmp("users",value)){
 		parce_data((char *)url,'/',&pos,value);
 		if(strlen(value)>0){
-			rest_server_error(&task,result,&ok);
+			rest_server_error(result,&ok);
 		} else {
 			printf("alta de un usuario\n");
-			if(check_data_user_add(con_info->data,result)){
-			} else {
+			if(ok = check_data_user_add(con_info->data,result))
 				task_init(task,&token,T_USER_ADD,con_info->data);
-			}
 		}
 	/* PARA LAS SUSCRIPCIONES */
 	} else if(0 == strcmp("suscriptions",value)){
 		parce_data((char *)url,'/',&pos,value);
 		if(strlen(value)>0){
-			rest_server_error(&task,result,&ok);
+			rest_server_error(result,&ok);
 		} else {
 			printf("alta de una suscripsion\n");
-			if(check_data_susc_add(con_info->data,result)){
-			} else {
+			if(ok = check_data_susc_add(con_info->data,result))
 				task_init(task,&token,T_SUSC_ADD,con_info->data);
-			}
 		}
 	/* CUALQUIER OTRA COSA. ERROR */
 	} else {
-		rest_server_error(&task,result,&ok);
+		strcpy(result,"URL mal ingresada");
+		ok=0;
+		rest_server_error(result,&ok);
 	}
 
 	if(ok){
 		rest_server_add_task(&rest_server,task);
 		sprintf(result,"{\"task\":\"%s\",\"status\":\"TODO\"}",task_get_id(task));
+	} else {
+		printf("No OK : %s\n",result);
+		task_destroy(&task);
 	}
 	send_page (connection,result);
 	return ok;
@@ -218,22 +232,30 @@ static int handle_GET(struct MHD_Connection *connection, const char *url){
 		if(strlen(value)>0){
 			strcpy(userid,value);
 			parce_data((char *)url,'/',&pos,value);
-			/* PARA LAS SUSCRIPCIONES DEL USUARIO */
-			if(0 == strcmp("suscriptions",value)) {
-				parce_data((char *)url,'/',&pos,value);
-				if(strlen(value)>0){
-					printf("info de suscripcion\n");
-					data = malloc(sizeof(T_dictionary));
-					dictionary_init(data);
-					dictionary_add(data,"userid",userid);
-					dictionary_add(data,"suscripid",value);
-					task_init(task,&token,T_SUSC_SHOW,data);
+			if(strlen(value)>0){
+				/* PARA LAS SUSCRIPCIONES DEL USUARIO */
+				if(0 == strcmp("suscriptions",value)) {
+					parce_data((char *)url,'/',&pos,value);
+					if(strlen(value)>0){
+						printf("info de suscripcion\n");
+						data = malloc(sizeof(T_dictionary));
+						dictionary_init(data);
+						dictionary_add(data,"userid",userid);
+						dictionary_add(data,"suscripid",value);
+						task_init(task,&token,T_SUSC_SHOW,data);
+					} else {
+						printf("listado de suscripciones del usuario\n");
+						task_init(task,&token,T_SUSC_LIST,NULL);
+					}
 				} else {
-					printf("listado de suscripciones del usuario\n");
-					task_init(task,&token,T_SUSC_LIST,NULL);
+					rest_server_error(result,&ok);
 				}
 			} else {
-				rest_server_error(&task,result,&ok);
+				/* Informacion sobre un usuario */
+				data = malloc(sizeof(T_dictionary));
+				dictionary_init(data);
+				dictionary_add(data,"userid",userid);
+				task_init(task,&token,T_USER_SHOW,data);
 			}
 		} else {
 			printf("listado de usuarios\n");
@@ -255,11 +277,17 @@ static int handle_GET(struct MHD_Connection *connection, const char *url){
 
 	/* PARA CUALQUIER OTRA COSA */
 	} else {
-		rest_server_error(&task,result,&ok);
+		rest_server_error(result,&ok);
 	}
-	if(!isTaskStatus && ok){
-		sprintf(result,"{\"task\":\"%s\",\"status\":\"TODO\"}",task_get_id(task));
-		rest_server_add_task(&rest_server,task);
+
+	if(ok){
+		if(!isTaskStatus){
+			sprintf(result,"{'task':'%s','status':'TODO'}",task_get_id(task));
+			rest_server_add_task(&rest_server,task);
+		}
+	} else {
+		printf("No OK : %s\n",result);
+		task_destroy(&task);
 	}
 	send_page (connection, result);
 	return ok;

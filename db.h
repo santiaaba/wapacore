@@ -21,5 +21,5 @@ const char *db_error(T_db *db);
 /* USERS */
 void db_user_list(T_db *db, MYSQL_RES **result);
 void db_user_show(T_db *db, MYSQL_RES **result, char *id);
-
+int db_user_add(T_db *db, char *name, char *pass, char *mail, char *message);
 #endif

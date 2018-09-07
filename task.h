@@ -37,9 +37,10 @@ typedef enum {
 } T_task_type;
 
 typedef enum {
-		T_WHAITINA,
+		T_WAITING,
 		T_RUNNING,
-		T_DONE
+		T_DONE_OK,
+		T_DONE_ERROR
 } T_task_status;
 
 typedef enum {
@@ -52,6 +53,7 @@ typedef struct bag_task T_bag_task;
 
 typedef char T_taskid[TASKID_SIZE];
 typedef char T_tasktoken[TOKEN_SIZE];
+
 
 /*****************************
 		TASK	
@@ -71,12 +73,15 @@ void task_init(T_task *t, T_tasktoken *token, T_task_type type, T_dictionary *da
 void task_destroy(T_task **t);
 void task_run(T_task *t, T_db *db);
 T_tasktoken *task_get_token(T_task *t);
+void task_print_status(T_task *t, char *s);
 char *task_get_id(T_task *t);
+T_task_status task_get_status(T_task *t);
 char *task_get_result(T_task *t);
 
 /* USERS */
 int task_user_list(T_task *t, T_db *db);
 int task_user_show(T_task *t, T_db *db);
+int task_user_add(T_task *t, T_db *db);
 
 /*****************************
          Cola de tareas
@@ -94,7 +99,7 @@ struct heap_task {
 
 void heap_task_init(T_heap_task *h);
 void heap_task_push(T_heap_task *h, T_task *t);
-int  heap_task_exist(T_heap_task *h,T_taskid id);
+T_task *heap_task_exist(T_heap_task *h, T_taskid id);
 T_task *heap_task_pop(T_heap_task *h);
 unsigned int heap_task_size(T_heap_task *h);
 void heap_task_print(T_heap_task *h);

@@ -43,7 +43,6 @@ void rest_server_init(T_rest_server *r, T_db *db);
 void rest_server_add_task(T_rest_server *r, T_task *j);
 void rest_server_lock(T_rest_server *r);
 void rest_server_unlock(T_rest_server *r);
-void rest_server_error(T_task **task, char *result, int *ok);
 void rest_server_lock(T_rest_server *r);
 void rest_server_unlock(T_rest_server *r);
 
