@@ -1,5 +1,15 @@
 #include "rest_server.h"
 
+int check_data_plan_add(T_dictionary *data, char *result){
+	return 1;
+}
+int check_data_user_add(T_dictionary *data, char *result){
+	return 1;
+}
+int check_data_susc_add(T_dictionary *data, char *result){
+	return 1;
+}
+
 void rest_server_add_task(T_rest_server *r, T_task *j){
 	printf("Agregamos el JOB: %s a la lista\n",task_get_id(j));
 
@@ -16,7 +26,7 @@ void rest_server_error(T_task **task, char *result, int *ok){
 	task_destroy(task);
 	printf("Error en la URL\n");
 	result = "{\"task\":\"\",\"stauts\":\"ERROR\"}";
-	ok=0;
+	*ok=0;
 }
 
 void *rest_server_do_task(void *param){
@@ -38,6 +48,61 @@ void *rest_server_do_task(void *param){
 			pthread_mutex_unlock(&(r->mutex_bag_task));
 		}
 	}
+}
+
+static int send_page(struct MHD_Connection *connection, const char *page){
+	int ret;
+	struct MHD_Response *response;
+
+	response = MHD_create_response_from_buffer(strlen(page), (void *)page,
+			MHD_RESPMEM_PERSISTENT);
+	if (!response)
+		return MHD_NO;
+
+	ret = MHD_queue_response (connection, MHD_HTTP_OK, response);
+	MHD_destroy_response (response);
+
+	return ret;
+}
+
+void rest_server_get_task(T_rest_server *r, T_taskid *taskid, char **result, unsigned int *size){
+	T_task *task;
+	unsigned int total_size;
+
+	pthread_mutex_lock(&(r->mutex_bag_task));
+	pthread_mutex_lock(&(r->mutex_heap_task));
+		printf("Buscadno TASK ID: %s\n",taskid);
+		/* Buscamos en la bolsa de tareas finalizadas */
+		bag_task_print(&(r->tasks_done));
+		task = bag_task_pop(&(r->tasks_done),taskid);
+		if(NULL == task){
+			printf("NO encontramos el task\n");
+			/* Verificamos si esta en la cola de tareas pendientes */
+			if(heap_task_exist(&(r->tasks_todo),(char *)taskid)){
+				/* Tarea existe y esta en espera */
+				sprintf(*result,"{\"taskid\":\"%s\",\"status\":\"WHAIT\"}",taskid);
+			} else {
+				/* Tarea no existe mas */
+				sprintf(*result,"{\"taskid\":\"%s\",\"status\":\"INEXIST\"}",taskid);
+			}
+		} else {
+			printf("Encontramos el task\n");
+			/* Tarea existe y ha finalizado */
+			sprintf(*result,"{\"taskid\":\"%s\",\"status\":\"DONE\",\"result\":\"",taskid);
+			total_size = (strlen(*result) + strlen(task_get_result(task)));
+			if(total_size > *size){
+				*result = (char *)realloc(*result,total_size + 10);
+				*size = total_size + 10;
+			}
+			strcat(*result,task_get_result(task));
+			strcat(*result,"\"}");
+			/* Eliminamos el task */
+			printf("ELIMINAMOS EL TASK\n");
+			task_destroy(&task);
+			printf("TASK ELIMINADO\n");
+		}
+	pthread_mutex_unlock(&(r->mutex_heap_task));
+	pthread_mutex_unlock(&(r->mutex_bag_task));
 }
 
 static int handle_POST(struct MHD_Connection *connection,
@@ -72,8 +137,8 @@ static int handle_POST(struct MHD_Connection *connection,
 			rest_server_error(&task,result,&ok);
 		} else {
 			printf("alta de un plan\n");
-			if(check_data_add_plan(con_info->data,result)){
-				task_init(task,&token,T_ADD_PLAN,con_info->data);
+			if(check_data_plan_add(con_info->data,result)){
+				task_init(task,&token,T_PLAN_ADD,con_info->data);
 			}
 		}
 	/* PARA LOS USUARIOS */
@@ -83,9 +148,9 @@ static int handle_POST(struct MHD_Connection *connection,
 			rest_server_error(&task,result,&ok);
 		} else {
 			printf("alta de un usuario\n");
-			if(check_data_add_user(con_info->data,result)){
+			if(check_data_user_add(con_info->data,result)){
 			} else {
-				task_init(task,&token,T_ADD_USER,con_info->data);
+				task_init(task,&token,T_USER_ADD,con_info->data);
 			}
 		}
 	/* PARA LAS SUSCRIPCIONES */
@@ -95,9 +160,9 @@ static int handle_POST(struct MHD_Connection *connection,
 			rest_server_error(&task,result,&ok);
 		} else {
 			printf("alta de una suscripsion\n");
-			if(check_data_add_user(con_info->data,result)){
+			if(check_data_susc_add(con_info->data,result)){
 			} else {
-				task_init(task,&token,T_ADD_SUSCRIP,con_info->data);
+				task_init(task,&token,T_SUSC_ADD,con_info->data);
 			}
 		}
 	/* CUALQUIER OTRA COSA. ERROR */
@@ -116,7 +181,7 @@ static int handle_POST(struct MHD_Connection *connection,
 static int handle_GET(struct MHD_Connection *connection, const char *url){
 	char value[100];
 	int pos=1;
-	int userid;
+	char userid[40];
 	T_dictionary *data;
 	char *result = (char *)malloc(TASKRESULT_SIZE);
 	unsigned int size_result = TASKRESULT_SIZE;
@@ -141,17 +206,17 @@ static int handle_GET(struct MHD_Connection *connection, const char *url){
 			data = malloc(sizeof(T_dictionary));
 			dictionary_init(data);
 			dictionary_add(data,"id",value);
-			task_init(task,&token,T_GET_PLAN,data);
+			task_init(task,&token,T_PLAN_SHOW,data);
 		} else {
 			printf("listado de planes\n");
-			task_init(task,&token,T_GET_PLANS,NULL);
+			task_init(task,&token,T_PLAN_LIST,NULL);
 		}
 
 	/* PARA LOS USUARIOS */
 	} else if(0 == strcmp("users",value)) {
 		parce_data((char *)url,'/',&pos,value);
 		if(strlen(value)>0){
-			userid = atoi(value);
+			strcpy(userid,value);
 			parce_data((char *)url,'/',&pos,value);
 			/* PARA LAS SUSCRIPCIONES DEL USUARIO */
 			if(0 == strcmp("suscriptions",value)) {
@@ -162,17 +227,17 @@ static int handle_GET(struct MHD_Connection *connection, const char *url){
 					dictionary_init(data);
 					dictionary_add(data,"userid",userid);
 					dictionary_add(data,"suscripid",value);
-					task_init(task,&token,T_GET_SUSCRIPTION,data);
+					task_init(task,&token,T_SUSC_SHOW,data);
 				} else {
 					printf("listado de suscripciones del usuario\n");
-					task_init(task,&token,T_GET_SUSCRIPTIONS,NULL);
+					task_init(task,&token,T_SUSC_LIST,NULL);
 				}
 			} else {
 				rest_server_error(&task,result,&ok);
 			}
 		} else {
 			printf("listado de usuarios\n");
-			task_init(task,&token,T_GET_PLANS,NULL);
+			task_init(task,&token,T_USER_LIST,NULL);
 		}
 
 	/* PARA LOS TASK */
@@ -198,59 +263,6 @@ static int handle_GET(struct MHD_Connection *connection, const char *url){
 	}
 	send_page (connection, result);
 	return ok;
-}
-
-void rest_server_get_task(T_rest_server *r, T_taskid *taskid, char **result, unsigned int *size){
-	T_task *task;
-	unsigned int total_size;
-
-	pthread_mutex_lock(&(r->mutex_bag_task));
-	pthread_mutex_lock(&(r->mutex_heap_task));
-		printf("Buscadno TASK ID: %s\n",taskid);
-		/* Buscamos en la bolsa de tareas finalizadas */
-		bag_task_print(&(r->tasks_done));
-		task = bag_task_pop(&(r->tasks_done),taskid);
-		if(NULL == task){
-			/* Verificamos si esta en la cola de tareas pendientes */
-			if(heap_task_exist(&(r->tasks_todo),(char *)taskid)){
-				/* Tarea existe y esta en espera */
-				sprintf(*result,"{\"taskid\":\"%s\",\"status\":\"WHAIT\"}",taskid);
-			} else {
-				/* Tarea no existe mas */
-				sprintf(*result,"{\"taskid\":\"%s\",\"status\":\"INEXIST\"}",taskid);
-			}
-		} else {
-			/* Tarea existe y ha finalizado */
-			sprintf(*result,"{\"taskid\":\"%s\",\"status\":\"DONE\",\"result\":\"",taskid);
-			total_size = (strlen(*result) + strlen(task_get_result(task)));
-			if(total_size > *size){
-				*result = (char *)realloc(*result,total_size + 10);
-				*size = total_size + 10;
-			}
-			strcat(*result,task_get_result(task));
-			strcat(*result,"\"}");
-			/* Eliminamos el task */
-			printf("ELIMINAMOS EL TASK\n");
-			task_destroy(&task);
-			printf("TASK ELIMINADO\n");
-		}
-	pthread_mutex_unlock(&(r->mutex_heap_task));
-	pthread_mutex_unlock(&(r->mutex_bag_task));
-}
-
-static int send_page(struct MHD_Connection *connection, const char *page){
-	int ret;
-	struct MHD_Response *response;
-
-	response = MHD_create_response_from_buffer(strlen(page), (void *)page,
-			MHD_RESPMEM_PERSISTENT);
-	if (!response)
-		return MHD_NO;
-
-	ret = MHD_queue_response (connection, MHD_HTTP_OK, response);
-	MHD_destroy_response (response);
-
-	return ret;
 }
 
 static int iterate_post (void *coninfo_cls, enum MHD_ValueKind kind, const char *key,

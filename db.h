@@ -18,4 +18,8 @@ int db_connect(T_db *db, T_config *c);
 void db_close(T_db *db);
 const char *db_error(T_db *db);
 
+/* USERS */
+void db_user_list(T_db *db, MYSQL_RES **result);
+void db_user_show(T_db *db, MYSQL_RES **result, char *id);
+
 #endif

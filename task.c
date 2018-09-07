@@ -82,6 +82,22 @@ char *tob_get_id(T_task *t){
 	return t->id;
 }
 
+int task_user_list(T_task *t, T_db *db){
+	MYSQL_RES *result;
+
+	db_user_list(db,&result);
+	json_user_list(&(t->result),&(t->result_size),result);
+}
+
+int task_user_show(T_task *t, T_db *db){
+	MYSQL_RES *result;
+	char *id;
+
+	id = dictionary_get(t->data,"id");
+	db_user_show(db,&result,id);
+	json_user_show(&(t->result),&(t->result_size),result);
+}
+
 void task_run(T_task *t, T_db *db){
 	/* Ejecuta el JOB */
 	printf("paso\n");
@@ -89,17 +105,19 @@ void task_run(T_task *t, T_db *db){
 	printf("paso\n");
 
 	switch(t->type){
-		case T_GET_SITES: break;
-		case T_GET_SITE: break;
-		case T_GET_WORKERS: break;
-		case T_GET_WORKER: break;
-		case T_ADD_SITE: break;
-		case T_DEL_SITE: break;
-		case T_MOD_SITE: break;
-		case T_STOP_WORKER: break;
-		case T_START_WORKER: break;
-		case T_STOP_SITE: break;
-		case T_START_SITE: break;
+		/* USERS */
+		case T_USER_LIST: task_user_list(t,db); break;
+		case T_USER_SHOW: task_user_show(t,db); break;
+		case T_USER_ADD: break;
+		case T_USER_MOD: break;
+		case T_USER_DEL: break;
+
+		/* SUSCRIPTION */
+		case T_SUSC_LIST: break;
+		case T_SUSC_SHOW: break;
+		case T_SUSC_ADD: break;
+		case T_SUSC_MOD: break;
+		case T_SUSC_DEL: break;
 	}
 	t->status = T_DONE;
 }

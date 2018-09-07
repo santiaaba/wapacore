@@ -19,3 +19,17 @@ void db_close(T_db *db){
 const char *db_error(T_db *db){
 	return mysql_error(db->con);
 }
+
+void db_user_list(T_db *db, MYSQL_RES **result){
+
+	mysql_query(db->con,"select id,name from user");
+	*result = mysql_store_result(db->con);
+}
+
+void db_user_show(T_db *db, MYSQL_RES **result,char *id){
+	char sql[100];
+
+	sprintf(sql,"select id,name,email from user where id=%s",id);
+	mysql_query(db->con,sql);
+	*result = mysql_store_result(db->con);
+}

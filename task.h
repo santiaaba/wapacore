@@ -14,17 +14,26 @@
 #define TASKRESULT_SIZE		200
 
 typedef enum {	
-		T_GET_SITES,
-		T_GET_SITE,
-		T_GET_WORKERS,
-		T_GET_WORKER,
-		T_ADD_SITE,
-		T_DEL_SITE,
-		T_MOD_SITE,
-		T_STOP_WORKER,
-		T_START_WORKER,
-		T_STOP_SITE,
-		T_START_SITE
+	/* PLAN */
+	T_PLAN_LIST,
+	T_PLAN_SHOW,
+	T_PLAN_ADD,
+	T_PLAN_MOD,
+	T_PLAN_DEL,
+	
+	/* USER */
+	T_USER_LIST,
+	T_USER_SHOW,
+	T_USER_ADD,
+	T_USER_MOD,
+	T_USER_DEL,
+
+	/* SUSCRIPTION */
+	T_SUSC_LIST,
+	T_SUSC_SHOW,
+	T_SUSC_ADD,
+	T_SUSC_MOD,
+	T_SUSC_DEL
 } T_task_type;
 
 typedef enum {
@@ -64,6 +73,10 @@ void task_run(T_task *t, T_db *db);
 T_tasktoken *task_get_token(T_task *t);
 char *task_get_id(T_task *t);
 char *task_get_result(T_task *t);
+
+/* USERS */
+int task_user_list(T_task *t, T_db *db);
+int task_user_show(T_task *t, T_db *db);
 
 /*****************************
          Cola de tareas
