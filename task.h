@@ -83,6 +83,9 @@ int task_user_list(T_task *t, T_db *db);
 int task_user_show(T_task *t, T_db *db);
 int task_user_add(T_task *t, T_db *db);
 
+/* SUSCRIPTION */
+int task_susc_add(T_task *t, T_db *db);
+
 /*****************************
          Cola de tareas
 ******************************/

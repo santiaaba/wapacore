@@ -130,6 +130,53 @@ int task_user_add(T_task *t, T_db *db){
 	}
 }
 
+int task_susc_add(T_task *t, T_db *db){
+	char *user_id = dictionary_get(t->data,"user_id");
+	char *plan_id = dictionary_get(t->data,"plan_id");
+
+	char result[100];
+	if(db_suscrip_add(db,user_id,plan_id,result)){
+		strcpy(t->result,"suscripcion generada");
+		t->status = T_DONE_OK;
+	} else {
+		strcpy(t->result,result);
+		t->status = T_DONE_ERROR;
+	}
+
+}
+
+int task_susc_show(T_task *t, T_db *db){
+	MYSQL_RES *result;
+	char *susc_id = dictionary_get(t->data,"susc_id");
+
+	/* Recolectamos los datos de la suscripcion global */
+	db_susc_show(db,susc_id,&result);
+	if(!json_susc_show(&(t->result),&(t->result_size),result)){	
+		t->status = T_DONE_ERROR;
+		return 0;
+	}
+
+	/* Si corresponde, recolectamos los datos de la suscripcion web */
+	db_susc_show_web(db,susc_id,&result);
+	IMPLEMENTAR!!!
+
+	/* Si corresponde, recolectamos los datos de la suscripcion MSsql */
+
+	/* Si corresponde, recolectamos los datos de la suscripcion Mysql */
+
+	t->status = T_DONE_OK;
+	return 1;
+}
+
+int task_susc_list(T_task *t, T_db *db){
+	MYSQL_RES *result;
+	char *user_id = dictionary_get(t->data,"user_id");
+
+        db_susc_list(db,user_id,&result);
+        json_susc_list(&(t->result),&(t->result_size),result);
+        t->status = T_DONE_OK;
+}
+
 void task_run(T_task *t, T_db *db){
 	/* Ejecuta el JOB */
 	t->status = T_RUNNING;
@@ -143,9 +190,9 @@ void task_run(T_task *t, T_db *db){
 		case T_USER_DEL: break;
 
 		/* SUSCRIPTION */
-		case T_SUSC_LIST: break;
-		case T_SUSC_SHOW: break;
-		case T_SUSC_ADD: break;
+		case T_SUSC_LIST: task_susc_list(t,db); break;
+		case T_SUSC_SHOW: task_susc_show(t,db); break;
+		case T_SUSC_ADD: task_susc_add(t,db); break;
 		case T_SUSC_MOD: break;
 		case T_SUSC_DEL: break;
 	}
