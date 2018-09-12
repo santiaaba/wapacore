@@ -3,6 +3,7 @@
 int check_data_plan_add(T_dictionary *data, char *result){
 	return 1;
 }
+
 int check_data_user_add(T_dictionary *data, char *result){
 	/* Verificamos existencia parametros */
 	if(dictionary_get(data,"name") == NULL){
@@ -19,16 +20,25 @@ int check_data_user_add(T_dictionary *data, char *result){
 	}
 	return 1;
 }
+
+int check_data_user_mod(T_dictionary *data, char *result){
+	return 1;
+}
+
 int check_data_susc_add(T_dictionary *data, char *result){
 	/*Verificamos existensia de parametros */
 	if(dictionary_get(data,"plan_id") == NULL){
-                strcpy(result,"Falta parametro id del plan (plan_id)");
-                return 0;
-        }
-        if(dictionary_get(data,"user_id") == NULL){
-                strcpy(result,"Falta parametro id del user (user_id)");
-                return 0;
-        }
+		strcpy(result,"Falta parametro id del plan (plan_id)");
+		return 0;
+	}
+	if(dictionary_get(data,"user_id") == NULL){
+		strcpy(result,"Falta parametro id del user (user_id)");
+		return 0;
+	}
+	return 1;
+}
+
+int check_data_susc_mod(T_dictionary *data, char *result){
 	return 1;
 }
 
@@ -41,7 +51,6 @@ void rest_server_add_task(T_rest_server *r, T_task *j){
 		/* Para debug imprimimis la lista hasta el momento */
 		//heap_task_print(&(r->tasks_todo));
 	pthread_mutex_unlock(&(r->mutex_heap_task));
-
 }
 
 void rest_server_error(char *result, int *ok){
@@ -61,11 +70,18 @@ void *rest_server_do_task(void *param){
 		pthread_mutex_unlock(&(r->mutex_heap_task));
 		if(task != NULL){
 			task_run(task,r->db);
-			pthread_mutex_lock(&(r->mutex_bag_task));
-				printf("BAG_TASK - %s\n",task_get_id(task));
-				bag_task_add(&(r->tasks_done),task);
-				bag_task_print(&(r->tasks_done));
-			pthread_mutex_unlock(&(r->mutex_bag_task));
+			if(tasl_get_status(task)>1){
+				pthread_mutex_lock(&(r->mutex_bag_task));
+					printf("BAG_TASK - %s\n",task_get_id(task));
+					bag_task_add(&(r->tasks_done),task);
+					bag_task_print(&(r->tasks_done));
+				pthread_mutex_unlock(&(r->mutex_bag_task));
+			} else {
+				pthread_mutex_lock(&(r->mutex_heap_task));
+					printf("TASK nuevamente en la cola\n");
+					heap_task_push(&(r->tasks_todo),task);
+				pthread_mutex_unlock(&(r->mutex_heap_task));
+			}
 		}
 	}
 }
@@ -130,7 +146,7 @@ static int handle_POST(struct MHD_Connection *connection,
 	int ok=1;
 	char value[100];
 	char *result = (char *)malloc(TASKRESULT_SIZE);
-        unsigned int size_result = TASKRESULT_SIZE;
+	unsigned int size_result = TASKRESULT_SIZE;
 	T_task *task;
 	T_taskid *taskid;
 
@@ -168,26 +184,115 @@ static int handle_POST(struct MHD_Connection *connection,
 			parce_data((char *)url,'/',&pos,value);
 			if(strlen(value)>0){
 				/* PARA LAS SUSCRIPCIONES DEL USUARIO */
-				if(0 == strcmp("suscriptions",value)){
-					printf("alta de una suscripcion");
-					if(ok = check_data_susc_add(con_info->data,result))
-						task_init(task,&token,T_SUSC_ADD,con_info->data);
+				if(0 == strcmp("susc",value)){
+					parce_data((char *)url,'/',&pos,value);
+					if(strlen(value)>0){
+						dictionary_add(con_info->data,"susc_id",value);
+						if(ok = check_data_susc_mod(con_info->data,result))
+							task_init(task,&token,T_SUSC_MOD,con_info->data);
+						else
+							rest_server_error(result,&ok);
+					} else {
+						/* ALTA SUSCRIPCIONES */
+						if(ok = check_data_susc_add(con_info->data,result))
+							task_init(task,&token,T_SUSC_ADD,con_info->data);
+						else
+							rest_server_error(result,&ok);
+					}
 				} else {
 					rest_server_error(result,&ok);
 				}
 			} else {
-				rest_server_error(result,&ok);
+				/* EDICION DE USUARIO */
+				if(ok = check_data_user_mod(con_info->data,result))
+					task_init(task,&token,T_USER_MOD,con_info->data);
+				else
+					rest_server_error(result,&ok);
 			}
 		} else {
-			printf("alta de un usuario\n");
+			/* ALTA DE USUARIO */
 			if(ok = check_data_user_add(con_info->data,result))
 				task_init(task,&token,T_USER_ADD,con_info->data);
+			else
+				rest_server_error(result,&ok);
 		}
 	/* CUALQUIER OTRA COSA. ERROR */
 	} else {
 		strcpy(result,"URL mal ingresada");
 		ok=0;
 		rest_server_error(result,&ok);
+	}
+
+	if(ok){
+		rest_server_add_task(&rest_server,task);
+		sprintf(result,"{\"task\":\"%s\",\"status\":\"TODO\"}",task_get_id(task));
+	} else {
+		printf("No OK : %s\n",result);
+		task_destroy(&task);
+	}
+	send_page (connection,result);
+	return ok;
+}
+
+static int handle_DELETE(struct MHD_Connection *connection, const char *url){
+
+	char value[100];
+	int pos=1;
+	int ok=1;
+	T_dictionary *data;
+	char *result = (char *)malloc(TASKRESULT_SIZE);
+	unsigned int size_result = TASKRESULT_SIZE;
+	T_task *task;
+	T_taskid *taskid;
+
+	task = (T_task *)malloc(sizeof(T_task));
+
+	printf("HANDLE DELETE\n");
+	/* El token de momento lo inventamos
+	 * pero deberia venir en el header del mensaje */
+	T_tasktoken token;
+	random_token(token);
+
+	/* PARA LOS PLANES */
+	parce_data((char *)url,'/',&pos,value);
+	if(0 == strcmp("plans",value)){
+		parce_data((char *)url,'/',&pos,value);
+		if(strlen(value)> 0){
+			/* BORRAR PLAN */
+			task_init(task,&token,T_PLAN_DEL,data);
+		} else {
+			rest_server_error(result,&ok);
+		}
+	} else if(0 == strcmp("users",value)){
+		parce_data((char *)url,'/',&pos,value);
+		printf("PASO users\n");
+		if(strlen(value)> 0){
+			data = malloc(sizeof(T_dictionary));
+			dictionary_init(data);
+			dictionary_add(data,"user_id",value);
+			parce_data((char *)url,'/',&pos,value);
+			printf("PASO user_id\n");
+			if(strlen(value)>0){
+				if(0 == strcmp("susc",value)) {
+					parce_data((char *)url,'/',&pos,value);
+					if(strlen(value)>0){
+						/* BORRADO SUSCRIPCION */
+						dictionary_add(data,"susc_id",value);
+						task_init(task,&token,T_SUSC_DEL,data);
+					} else {
+						rest_server_error(result,&ok);
+					}
+				} else {
+					rest_server_error(result,&ok);
+				}
+			} else {
+				/* BORRAR USUARIO */
+				printf("Borrar usuario\n");
+				task_init(task,&token,T_USER_DEL,data);
+			}
+		} else {
+			rest_server_error(result,&ok);
+		}
 	}
 
 	if(ok){
@@ -218,8 +323,8 @@ static int handle_GET(struct MHD_Connection *connection, const char *url){
 	random_token(token);
 
 	task = (T_task *)malloc(sizeof(T_task));
-	parce_data((char *)url,'/',&pos,value);
 
+	parce_data((char *)url,'/',&pos,value);
 	/* PARA LOS PLANES */
 	if(0 == strcmp("plans",value)){
 		parce_data((char *)url,'/',&pos,value);
@@ -244,12 +349,28 @@ static int handle_GET(struct MHD_Connection *connection, const char *url){
 			parce_data((char *)url,'/',&pos,value);
 			if(strlen(value)>0){
 				/* PARA LAS SUSCRIPCIONES DEL USUARIO */
-				if(0 == strcmp("suscriptions",value)) {
+				if(0 == strcmp("susc",value)) {
 					parce_data((char *)url,'/',&pos,value);
 					if(strlen(value)>0){
-						printf("info de suscripcion\n");
 						dictionary_add(data,"susc_id",value);
-						task_init(task,&token,T_SUSC_SHOW,data);
+						parce_data((char *)url,'/',&pos,value);
+						if(strlen(value)>0){
+							if(0 == strcmp("sites",value)){
+								parce_data((char *)url,'/',&pos,value);
+								if(strlen(value)>0){
+									/* Show site */
+									dictionary_add(data,"site_id",value);
+									task_init(task,&token,T_SITE_SHOW,data);
+								} else {
+									/* Listado de sitios */
+									task_init(task,&token,T_SITE_LIST,data);
+								}
+							} else {
+								rest_server_error(result,&ok);
+							}
+						} else {
+							task_init(task,&token,T_SUSC_SHOW,data);
+						}
 					} else {
 						printf("listado de suscripciones del usuario\n");
 						task_init(task,&token,T_SUSC_LIST,data);
@@ -362,6 +483,12 @@ static int answer_to_connection (void *cls, struct MHD_Connection *connection,
 		handle_GET(connection,url);
 		return MHD_YES;
 	}
+
+	if (0 == strcmp (method, "DELETE")){
+		handle_DELETE(connection,url);
+		return MHD_YES;
+	}
+
 	if (0 == strcmp (method, "POST")){
 		struct connection_info_struct *con_info = *con_cls;
 		if (*upload_data_size != 0){

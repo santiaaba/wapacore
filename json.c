@@ -25,7 +25,7 @@ int json_user_show(char **data, int *size, MYSQL_RES *result){
 		sprintf(aux,"{}");
 		return 0;
 	} else {
-		sprintf(aux,"{'userid':'%s','name':'%s','email':'%s'}",row[0],row[1],row[2]);
+		sprintf(aux,"{\"userid\":\"%s\",\"name\":\"%s\",\"email\":\"%s\"}",row[0],row[1],row[2]);
 		*size = strlen(aux) + 1;
 		*data = (char *) realloc(*data,*size);
 		strcpy(*data,aux);
@@ -37,7 +37,7 @@ int json_task(char *status, char *id, char *result, char **message, unsigned int
 	/* Arma el resultado de un task */
 
 	int total_size = (strlen(*message) + strlen(result));
-	sprintf(*message,"{'taskid':'%s','status':'%s','data':",id,status);
+	sprintf(*message,"{\"taskid\":\"%s\",\"status\":\"%s\",\"data\":",id,status);
 	if(total_size > *size){
 		*message = (char *)realloc(*message,total_size + 20);
 		*size = total_size + 20;
@@ -59,12 +59,14 @@ int json_susc_list(char **data, int *size, MYSQL_RES *result){
 			*data = (char *) realloc(*data,*size);
 		}
 		printf("Utilizamos el sprintf\n");
-		sprintf(*data,"%s{'id':'%s','name':'%s','plan_name':'%s'},",*data,row[0],row[1],row[2]);
+		sprintf(*data,"%s{\"id\":\"%s\",\"name\":\"%s\",\"plan_name\":\"%s\"},",*data,row[0],row[1],row[2]);
 	}
 	(*data)[strlen(*data)-1] = ']';
 }
 
 int json_susc_show(char **data, int *size, MYSQL_RES *result){
+	/* Retorna todos los datos de una suscripcion.
+	 * incluyendo los datos de las nubes */
 
 	MYSQL_ROW row;
 	char aux[1000];
@@ -74,10 +76,20 @@ int json_susc_show(char **data, int *size, MYSQL_RES *result){
 		sprintf(aux,"{}");
 		return 0;
 	} else {
-		sprintf(aux,"{'suscid':'%s','plan name':'%s','name':'%s','status':'%s'}",row[0],row[1],row[2],row[3],row[4]);
+		sprintf(aux,"{\"suscid\":\"%s\",\"plan name\":\"%s\",\"name\":\"%s\",\"status\":\"%s\", \"services\": [",row[0],row[1],row[2],row[3]);
 		*size = strlen(aux) + 1;
 		*data = (char *) realloc(*data,*size);
 		strcpy(*data,aux);
+
+		/* Nube de hosting. Son los 1 datos a partir del row[4] inclusive */
+		if(row[5] != NULL){
+			sprintf(aux,"{\"name\":\"web_hosting\",\"hash_dir\":\"%s\",\"quota\":\"%s\",\"sites\":\"%s\"}",
+			row[4],row[5],row[6]);
+			*size = strlen(aux) + strlen(*data) + 4;
+			*data = (char *) realloc(*data,*size);
+			strcat(*data,aux);
+		}
+		strcat(*data,"]}");
 		return 1;
 	}
 }

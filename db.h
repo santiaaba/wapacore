@@ -5,6 +5,7 @@
 #include <mysql/mysql.h>
 #include "config.h"
 #include <stdlib.h>
+#include "dictionary.h"
 
 #ifndef DB_H
 #define DB_H
@@ -21,10 +22,12 @@ const char *db_error(T_db *db);
 /* USERS */
 void db_user_list(T_db *db, MYSQL_RES **result);
 void db_user_show(T_db *db, MYSQL_RES **result, char *id);
-int db_user_add(T_db *db, char *name, char *pass, char *mail, char *message);
+int db_user_add(T_db *db, T_dictionary *d, char *message);
+int db_user_mod(T_db *db, T_dictionary *d, char *message);
 
 /* SUSCRIPTION */
 void db_susc_list(T_db *db, char *user_id, MYSQL_RES **result);
 void db_susc_show(T_db *db, char *susc_id, MYSQL_RES **result);
-int db_suscrip_add(T_db *db, char *user_id, char *plan_id, char *message);
+int db_susc_add(T_db *db, T_dictionary *d, char *message);
+int db_susc_mod(T_db *db, T_dictionary *d, char *message);
 #endif

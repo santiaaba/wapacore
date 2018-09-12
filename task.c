@@ -116,12 +116,9 @@ int task_user_show(T_task *t, T_db *db){
 }
 
 int task_user_add(T_task *t, T_db *db){
-	char *name = dictionary_get(t->data,"name");
-	char *pass = dictionary_get(t->data,"pass");
-	char *email = dictionary_get(t->data,"email");
 	char result[100];
 
-	if(db_user_add(db,name,pass,email,result)){
+	if(db_user_add(db,t->data,result)){
 		strcpy(t->result,"usuario agregado correctamente");
 		t->status = T_DONE_OK;
 	} else {
@@ -130,12 +127,22 @@ int task_user_add(T_task *t, T_db *db){
 	}
 }
 
-int task_susc_add(T_task *t, T_db *db){
-	char *user_id = dictionary_get(t->data,"user_id");
-	char *plan_id = dictionary_get(t->data,"plan_id");
-
+int task_user_mod(T_task *t, T_db *db){
 	char result[100];
-	if(db_suscrip_add(db,user_id,plan_id,result)){
+	printf("Task modificar usuario\n");
+	if(db_user_mod(db,t->data,result)){
+		strcpy(t->result,"usuario modificado");
+		t->status = T_DONE_OK;
+	} else {
+		printf("result: %s\n",result);
+		strcpy(t->result,result);
+		t->status = T_DONE_ERROR;
+	}
+}
+
+int task_susc_add(T_task *t, T_db *db){
+	char result[100];
+	if(db_susc_add(db,t->data,result)){
 		strcpy(t->result,"suscripcion generada");
 		t->status = T_DONE_OK;
 	} else {
@@ -143,6 +150,42 @@ int task_susc_add(T_task *t, T_db *db){
 		t->status = T_DONE_ERROR;
 	}
 
+}
+
+int task_susc_del(T_task *t, T_db *db){
+	char result[100];
+	if(db_susc_del(db,t->data,result)){
+		strcpy(t->result,"suscripcion eliminada");
+		t->status = T_DONE_OK;
+	} else {
+		strcpy(t->result,result);
+		t->status = T_DONE_ERROR;
+	}
+}
+
+int task_user_del(T_task *t, T_db *db){
+	char result[100];
+	if(db_user_del(db,t->data,result)){
+		strcpy(t->result,"suscripcion eliminada");
+		t->status = T_DONE_OK;
+	} else {
+		strcpy(t->result,result);
+		t->status = T_DONE_ERROR;
+	}
+}
+
+int task_susc_mod(T_task *t, T_db *db){
+
+	char result[100];
+	printf("Task modificar suscripcion\n");
+	if(db_susc_mod(db,t->data,result)){
+		strcpy(t->result,"suscripcion modificada");
+		t->status = T_DONE_OK;
+	} else {
+		printf("result: %s\n",result);
+		strcpy(t->result,result);
+		t->status = T_DONE_ERROR;
+	}
 }
 
 int task_susc_show(T_task *t, T_db *db){
@@ -155,15 +198,6 @@ int task_susc_show(T_task *t, T_db *db){
 		t->status = T_DONE_ERROR;
 		return 0;
 	}
-
-	/* Si corresponde, recolectamos los datos de la suscripcion web */
-	db_susc_show_web(db,susc_id,&result);
-	IMPLEMENTAR!!!
-
-	/* Si corresponde, recolectamos los datos de la suscripcion MSsql */
-
-	/* Si corresponde, recolectamos los datos de la suscripcion Mysql */
-
 	t->status = T_DONE_OK;
 	return 1;
 }
@@ -177,24 +211,59 @@ int task_susc_list(T_task *t, T_db *db){
         t->status = T_DONE_OK;
 }
 
+int task_site_list(T_task *t, T_db *db){
+	char buffer_tx[30];
+	char buffer_rx[30];
+	int pos=0;
+
+	if(T->status == T_TODO){
+		/* Es la primera vez que tratamos esta tarea */
+		sprintf(buffer_tx,"L|%s",dictionary_get(t->data,"susc_id"));
+		if(controller_send_resive(c,buffer_tx,buffer_rx)){
+			parce_data(buffer_rx,"|",&pos,value);
+			if(atoi(value) == 1){
+				parce_data(buffer_rx,"|",&pos,value);
+				dictionary_add(t->data,"c_task_id",value);
+				T->status = T_WAITING;
+			} else {
+				T->status = T_DONE_ERROR;
+			}
+		} else {
+			T->status = T_DONE_ERROR;
+		}
+	} else if(T->status == T_WAITING){
+		/* Estamos esperando que el Controller retornara
+ 		 * el resultado */
+	}
+}
+
 void task_run(T_task *t, T_db *db){
 	/* Ejecuta el JOB */
 	t->status = T_RUNNING;
+
+
 
 	switch(t->type){
 		/* USERS */
 		case T_USER_LIST: task_user_list(t,db); break;
 		case T_USER_SHOW: task_user_show(t,db); break;
 		case T_USER_ADD: task_user_add(t,db); break;
-		case T_USER_MOD: break;
-		case T_USER_DEL: break;
+		case T_USER_MOD: task_user_mod(t,db); break;
+		case T_USER_DEL: task_user_del(t,db); break;
 
 		/* SUSCRIPTION */
 		case T_SUSC_LIST: task_susc_list(t,db); break;
 		case T_SUSC_SHOW: task_susc_show(t,db); break;
 		case T_SUSC_ADD: task_susc_add(t,db); break;
-		case T_SUSC_MOD: break;
-		case T_SUSC_DEL: break;
+		case T_SUSC_MOD: task_susc_mod(t,db); break;
+	
+		/* SITES */
+		case T_SITE_LIST: task_site_list(t,db); break;
+		case T_SITE_SHOW: task_site_show(t,db); break;
+		case T_SITE_ADD: task_site_add(t,db); break;
+		case T_SITE_MOD: task_site_mod(t,db); break;
+		case T_SITE_DEL: task_site_del(t,db); break;
+		case T_SITE_DEL: task_site_del(t,db); break;
 	}
 }
 

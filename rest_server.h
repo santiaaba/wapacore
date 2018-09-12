@@ -15,7 +15,8 @@
 #define MAXANSWERSIZE   512
 #define GET		0
 #define POST		1
-#define DELETE		2
+#define PUT		2
+#define DELETE		3
 
 struct connection_info_struct {
         int connectiontype;

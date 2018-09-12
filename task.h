@@ -33,7 +33,15 @@ typedef enum {
 	T_SUSC_SHOW,
 	T_SUSC_ADD,
 	T_SUSC_MOD,
-	T_SUSC_DEL
+	T_SUSC_DEL,
+
+	/* SUSCRIPTION */
+	T_SITE_LIST,
+	T_SITE_SHOW,
+	T_SITE_ADD,
+	T_SITE_MOD,
+	T_SITE_DEL
+
 } T_task_type;
 
 typedef enum {

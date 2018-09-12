@@ -67,6 +67,17 @@ void dictionary_destroy(T_dictionary **d){
 	free(*d);
 }
 
+void dictionary_clean(T_dictionary *d){
+	dictionary_node *aux;
+
+	aux = d->first;
+	while(aux!=NULL){
+		aux = aux->next;
+		free(d->first);
+		d->first = aux;
+	}
+}
+
 void dictionary_print(T_dictionary *d){
 	dictionary_node *aux;
 
