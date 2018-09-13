@@ -49,6 +49,7 @@ void task_init(T_task *t, T_tasktoken *token, T_task_type type, T_dictionary *da
 	t->data = data;
 	t->result = (char *)malloc(TASKRESULT_SIZE);
 	t->result_size = TASKRESULT_SIZE;
+	t->cloud = NULL
 	strcpy(t->result,"");
 }
 
@@ -83,7 +84,7 @@ T_tasktoken *task_get_token(T_task *t){
 void task_print_status(T_task *t, char *s){
 	switch(t->status){
 	case T_WAITING: strcpy(s,"waiting"); break;
-	case T_RUNNING: strcpy(s,"running"); break;
+	case T_TODO: strcpy(s,"todo"); break;
 	case T_DONE_OK: strcpy(s,"done_ok"); break;
 	case T_DONE_ERROR: strcpy(s,"done_error"); break;
 	}
@@ -211,59 +212,93 @@ int task_susc_list(T_task *t, T_db *db){
         t->status = T_DONE_OK;
 }
 
-int task_site_list(T_task *t, T_db *db){
-	char buffer_tx[30];
-	char buffer_rx[30];
+int task_site_list(T_task *t){
+	/* Lista los sitios de una suscripcion en particular */
+	char buffer_tx[BUFFERSIZE];
+	char buffer_rx[BUFFERSIZE];
 	int pos=0;
+	char value[200];
 
-	if(T->status == T_TODO){
+	printf("Listamos los sitios.\n");
+	if(t->status == T_TODO){
 		/* Es la primera vez que tratamos esta tarea */
 		sprintf(buffer_tx,"L|%s",dictionary_get(t->data,"susc_id"));
-		if(controller_send_resive(c,buffer_tx,buffer_rx)){
-			parce_data(buffer_rx,"|",&pos,value);
+		if(cloud_send_resive(c,buffer_tx,buffer_rx)){
+			parce_data(buffer_rx,'|',&pos,value);
 			if(atoi(value) == 1){
-				parce_data(buffer_rx,"|",&pos,value);
+				parce_data(buffer_rx,'|',&pos,value);
 				dictionary_add(t->data,"c_task_id",value);
-				T->status = T_WAITING;
+				t->status = T_WAITING;
 			} else {
-				T->status = T_DONE_ERROR;
+				t->status = T_DONE_ERROR;
 			}
 		} else {
-			T->status = T_DONE_ERROR;
+			t->status = T_DONE_ERROR;
 		}
-	} else if(T->status == T_WAITING){
+	} else if(t->status == T_WAITING){
 		/* Estamos esperando que el Controller retornara
  		 * el resultado */
+		IMPLEMENTAR
 	}
 }
 
-void task_run(T_task *t, T_db *db){
-	/* Ejecuta el JOB */
-	t->status = T_RUNNING;
+int task_site_show(T_task *t){
+	printf("IMPLEMENTAR\n");
+}
+int task_site_add(T_task *t){
+	printf("IMPLEMENTAR\n");
+}
+int task_site_del(T_task *t){
+	printf("IMPLEMENTAR\n");
+}
+int task_site_mod(T_task *t){
+	printf("IMPLEMENTAR\n");
+}
 
+void task_run(T_task *t, T_db *db, T_list_cloud *cl){
+	T_cloud *c;
+	char *valor;
+	int cloud_id;
 
-
-	switch(t->type){
-		/* USERS */
-		case T_USER_LIST: task_user_list(t,db); break;
-		case T_USER_SHOW: task_user_show(t,db); break;
-		case T_USER_ADD: task_user_add(t,db); break;
-		case T_USER_MOD: task_user_mod(t,db); break;
-		case T_USER_DEL: task_user_del(t,db); break;
-
-		/* SUSCRIPTION */
-		case T_SUSC_LIST: task_susc_list(t,db); break;
-		case T_SUSC_SHOW: task_susc_show(t,db); break;
-		case T_SUSC_ADD: task_susc_add(t,db); break;
-		case T_SUSC_MOD: task_susc_mod(t,db); break;
+	if(t->type <= T_SUSC_DEL ){
+		/* No son acciones sobre una nube */
+		switch(t->type){
+			/* USERS */
+			case T_USER_LIST: task_user_list(t,db); break;
+			case T_USER_SHOW: task_user_show(t,db); break;
+			case T_USER_ADD: task_user_add(t,db); break;
+			case T_USER_MOD: task_user_mod(t,db); break;
+			case T_USER_DEL: task_user_del(t,db); break;
 	
-		/* SITES */
-		case T_SITE_LIST: task_site_list(t,db); break;
-		case T_SITE_SHOW: task_site_show(t,db); break;
-		case T_SITE_ADD: task_site_add(t,db); break;
-		case T_SITE_MOD: task_site_mod(t,db); break;
-		case T_SITE_DEL: task_site_del(t,db); break;
-		case T_SITE_DEL: task_site_del(t,db); break;
+			/* SUSCRIPTION */
+			case T_SUSC_LIST: task_susc_list(t,db); break;
+			case T_SUSC_SHOW: task_susc_show(t,db); break;
+			case T_SUSC_ADD: task_susc_add(t,db); break;
+			case T_SUSC_MOD: task_susc_mod(t,db); break;
+		}
+	} else {
+		/* Son acciones sobre alguna nube */
+		if(t->cloud == NULL){
+			/* Averiguamos la nube */
+			if( t-type <= T_SITE_DEL){
+				/* Acciones sobre una nube web */
+				dictionary_get(t->data,"susc_id",valor);
+				if(! db_get_cloud_id(db,valor,C_WEB,&cloud_id)){
+					printf("ERROR. Cloud no encontrada\n");
+				}
+				c = list_cloud_find_by_id(cl,cloud_id);
+				t->cloud = c;
+			}
+
+			switch(t->type){
+				/* SITES */
+				case T_SITE_LIST: task_site_list(t); break;
+				case T_SITE_SHOW: task_site_show(t); break;
+				case T_SITE_ADD: task_site_add(t); break;
+				case T_SITE_MOD: task_site_mod(t); break;
+				case T_SITE_DEL: task_site_del(t); break;
+			}
+		}
 	}
 }
 
@@ -357,7 +392,6 @@ void bag_task_add(T_bag_task *b, T_task *t){
 	bag_t_node *new;
 	bag_t_node *aux;
 
-	printf("Entroooo\n");
 	new = (bag_t_node*)malloc(sizeof(bag_t_node));
 	new->next = NULL;
 	new->data = t;
@@ -409,7 +443,7 @@ T_task *bag_task_pop(T_bag_task *b, T_taskid *id){
 
 	b->actual = b->first;
 	while((b->actual != NULL) && !exist){
-		printf("Comparamos -%s- con -%s-\n",id,task_get_id(b->actual->data));
+		//printf("Comparamos -%s- con -%s-\n",id,task_get_id(b->actual->data));
 		exist = (strcmp(task_get_id(b->actual->data),(char *)id)==0);
 		if((!exist && (b->actual != NULL))){
 			b->actual = b->actual->next;

@@ -33,6 +33,7 @@ typedef struct t_r_server {
 	pthread_mutex_t mutex_heap_task;
 	pthread_mutex_t mutex_bag_task;
 	T_db *db;
+	T_list_cloud *l;
 	} T_rest_server;
 
 /* Variables externas que se encuentran en controller.c,
@@ -40,7 +41,7 @@ typedef struct t_r_server {
  * se encuentran en LA ZONA CRITICA de los hilos */
 extern T_rest_server rest_server;
 
-void rest_server_init(T_rest_server *r, T_db *db);
+void rest_server_init(T_rest_server *r, T_db *db, T_list_cloud *cl);
 void rest_server_add_task(T_rest_server *r, T_task *j);
 void rest_server_lock(T_rest_server *r);
 void rest_server_unlock(T_rest_server *r);

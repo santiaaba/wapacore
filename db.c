@@ -20,6 +20,44 @@ const char *db_error(T_db *db){
 	return mysql_error(db->con);
 }
 
+int db_load_clouds(T_db *db, T_list_cloud *clouds){
+	MYSQL_ROW row;
+	MYSQL_RES *result;
+	T_cloud *new_cloud;
+
+	mysql_query(db->con,"select * from cloud");
+	result = mysql_store_result(db->con);
+	while ((row = mysql_fetch_row(result))){
+		new_cloud = (T_cloud *)malloc(sizeof(T_cloud));
+		cloud_init(new_cloud,atoi(row[0]),atoi(row[2]),row[1],row[3],row[4],row[5]);
+		list_cloud_add(clouds,new_cloud);
+	}
+}
+
+int db_get_cloud_id(T_db *db, int susc_id, T_cloud_type t, int *cloud_id){
+	/* Retorna el id de una nube en base al id de una suscripcion
+ 	 * y al tipo de nube. Recordar que un plan puede tener varias
+ 	 * nubes pero no mas de una de cada tipo. Si no encuentra la nube
+ 	 * retorna 0. Caso contrario retorna 1 y en el parametro cloud_id
+ 	 * el id de la nube */
+
+	char sql[400];
+	MYSQL_RES *result;
+	MYSQL_ROW row;
+
+	sprintf(sql,"select n.id from nube n inner join plan_nube p on (n.id = p.id_nube) inner join plan pp on (p.id_plan = pp.id) inner join suscription s on (pp.id = s.plan_id) where s.id=%i and n.tipo=%i",susc_id,t);
+
+	mysql_query(db->con,sql);
+	result = mysql_store_result(db->con);
+	row = mysql_fetch_row(result);
+	if(row){
+		*cloud_id=atoi(row[0]);
+		return 1;
+	} else {
+		return 0;
+	}
+}
+
 void db_user_list(T_db *db, MYSQL_RES **result){
 
 	mysql_query(db->con,"select id,name from user");

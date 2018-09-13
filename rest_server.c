@@ -69,7 +69,7 @@ void *rest_server_do_task(void *param){
 			printf("DO_TASK - %s\n",task_get_id(task));
 		pthread_mutex_unlock(&(r->mutex_heap_task));
 		if(task != NULL){
-			task_run(task,r->db);
+			task_run(task,r->db,r->clouds);
 			if(tasl_get_status(task)>1){
 				pthread_mutex_lock(&(r->mutex_bag_task));
 					printf("BAG_TASK - %s\n",task_get_id(task));
@@ -363,6 +363,7 @@ static int handle_GET(struct MHD_Connection *connection, const char *url){
 									task_init(task,&token,T_SITE_SHOW,data);
 								} else {
 									/* Listado de sitios */
+									printf("T_SITE_LIST\n");
 									task_init(task,&token,T_SITE_LIST,data);
 								}
 							} else {
@@ -513,9 +514,10 @@ void *rest_server_start(void *param){
 			request_completed, NULL, MHD_OPTION_END);
 }
 
-void rest_server_init(T_rest_server *r, T_db *db){
+void rest_server_init(T_rest_server *r, T_db *db, T_list_cloud *c){
 
 	r->db = db;
+	r->clouds = c;
 	heap_task_init(&(r->tasks_todo));
 	bag_task_init(&(r->tasks_done));
 	if(0 != pthread_create(&(r->thread), NULL, &rest_server_start, r)){

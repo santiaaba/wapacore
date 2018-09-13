@@ -6,6 +6,7 @@
 #include "config.h"
 #include <stdlib.h>
 #include "dictionary.h"
+#include "cloud.h"
 
 #ifndef DB_H
 #define DB_H
@@ -18,6 +19,9 @@ void db_init(T_db *db);
 int db_connect(T_db *db, T_config *c);
 void db_close(T_db *db);
 const char *db_error(T_db *db);
+
+int db_load_clouds(T_db *db, T_list_cloud *clouds);
+int db_get_cloud_id(T_db *db, int susc_id, T_cloud_type t, int *cloud_id);
 
 /* USERS */
 void db_user_list(T_db *db, MYSQL_RES **result);
