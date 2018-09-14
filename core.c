@@ -27,6 +27,7 @@ void main(){
 	
 	// Conectamos contra la base de datos
 	db_init(&db);
+
 	if (!db_connect(&db,&config)){
 		printf("Error coneccion a la base de datos: %s\n",db_error(&db));
 		exit(1);
@@ -34,12 +35,16 @@ void main(){
 
 	// Levantamos de la base de datos las nubes
 	list_cloud_init(&clouds);
-	db_load_clouds(&db,&clouds);
+	if(!db_load_clouds(&db,&clouds)){
+		printf("Imposible levantar los datos de la base de datos\n");
+		exit(1);
+	}
 
 	// Iniciamos el server REST para la API
 	rest_server_init(&rest_server,&db,&clouds);
 
 	while(1){
 		/* Revisamos estado de las nubes */
+		sleep(2);
 	}
 }

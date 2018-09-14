@@ -70,7 +70,7 @@ void *rest_server_do_task(void *param){
 		pthread_mutex_unlock(&(r->mutex_heap_task));
 		if(task != NULL){
 			task_run(task,r->db,r->clouds);
-			if(tasl_get_status(task)>1){
+			if(task_get_status(task)>1){
 				pthread_mutex_lock(&(r->mutex_bag_task));
 					printf("BAG_TASK - %s\n",task_get_id(task));
 					bag_task_add(&(r->tasks_done),task);
@@ -130,8 +130,8 @@ void rest_server_get_task(T_rest_server *r, T_taskid *taskid, char **message, un
 		task_print_status(task,status);
 		json_task(status,task_get_id(task),task_get_result(task),message,size);
 
-		/* Destruimos el task si esta ya finalizado */
-		if(task_get_status(task) > T_RUNNING)
+		/* Destruimos el task si este ya a finalizado */
+		if(task_get_status(task) > T_WAITING)
 			task_destroy(&task);
 	}
 

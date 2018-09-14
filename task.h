@@ -4,6 +4,7 @@
 #include "json.h"
 #include "dictionary.h"
 #include "cloud.h"
+#include <string.h>
 #include "db.h"
 #include <time.h>
 
@@ -74,7 +75,7 @@ typedef struct {
 	T_task_type type;		//tipo de accion a realizar
 	T_task_status status;		//estado del task
 	T_dictionary *data;		//datos necesarios para realizar la accion
-	T_cloud *t;			//Cuando interviene una nube... queda asignada
+	T_cloud *cloud;			//Cuando interviene una nube... queda asignada
 	char *result;			//resultado en formato json para retornar.
 	unsigned int result_size;	//datos para realizar la accion
 } T_task;

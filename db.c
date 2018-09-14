@@ -22,15 +22,19 @@ const char *db_error(T_db *db){
 
 int db_load_clouds(T_db *db, T_list_cloud *clouds){
 	MYSQL_ROW row;
-	MYSQL_RES *result;
 	T_cloud *new_cloud;
 
-	mysql_query(db->con,"select * from cloud");
-	result = mysql_store_result(db->con);
-	while ((row = mysql_fetch_row(result))){
-		new_cloud = (T_cloud *)malloc(sizeof(T_cloud));
-		cloud_init(new_cloud,atoi(row[0]),atoi(row[2]),row[1],row[3],row[4],row[5]);
-		list_cloud_add(clouds,new_cloud);
+	mysql_query(db->con,"select * from nube");
+	MYSQL_RES *result = mysql_store_result(db->con);
+	if(result){
+		while (row = mysql_fetch_row(result)){
+			new_cloud = (T_cloud *)malloc(sizeof(T_cloud));
+			cloud_init(new_cloud,atoi(row[0]),atoi(row[2]),row[1],row[3],row[4],row[5],row[6]);
+			list_cloud_add(clouds,new_cloud);
+		}
+		return 1;
+	} else {
+		return 0;
 	}
 }
 

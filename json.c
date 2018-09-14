@@ -93,3 +93,35 @@ int json_susc_show(char **data, int *size, MYSQL_RES *result){
 		return 1;
 	}
 }
+
+void json_site_list(char **data, int *size){
+	// Toma los datos en crudo de **data y los
+	// convierte en formato json
+	char *aux;
+	int aux_size;
+	int total_size;
+	char id[20];
+	char name[50];
+	char aux_site[100]; //Entre id,name y llaves no deben superar los 100
+	int pos=0;
+
+	aux=(char *)malloc(*size);
+	strcpy(aux,*data);
+	aux_size = *size;
+	strcpy(*data,"{[");
+	while(pos < aux_size){
+		parce_data(aux,':',&pos,id);
+		parce_data(aux,':',&pos,name);
+		sprintf(aux_site,"{\"id\":\"%s\",\"name\":\"%s\"},",id,name);
+		total_size = strlen(*data) + strlen(aux_site);
+		if(*size < total_size){
+			// +100 para no tener que hacer realloc en cada iteracion
+			*data=(char *)realloc(*data,total_size + 100);	
+			*size = total_size + 100;
+		}
+		strcat(*data,aux_site);
+	}
+	(*data)[strlen(*data)-1] = ']';
+	strcat(*data,"}");
+	free(aux);
+}

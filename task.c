@@ -49,7 +49,7 @@ void task_init(T_task *t, T_tasktoken *token, T_task_type type, T_dictionary *da
 	t->data = data;
 	t->result = (char *)malloc(TASKRESULT_SIZE);
 	t->result_size = TASKRESULT_SIZE;
-	t->cloud = NULL
+	t->cloud = NULL;
 	strcpy(t->result,"");
 }
 
@@ -212,6 +212,35 @@ int task_susc_list(T_task *t, T_db *db){
         t->status = T_DONE_OK;
 }
 
+int task_store_result(T_task *t, char moredata){
+	/* Almacena en ->data, el resultado en bruto obtenido por la nube */
+	/* Moredata indica si hay mas datos a recibir, lo que implica realziar
+ 	 * un send_resive a la nube */
+	char buffer_rx[BUFFERSIZE];
+	int pos;
+	char aux[BUFFERSIZE];
+	int cant=1;
+	char *concat_aux;
+
+	while(moredata == '1'){
+		concat_aux = (char *)realloc(concat_aux,BUFFERSIZE*cant);
+		pos=6;
+		parce_data(buffer_rx,'|',&pos,aux);
+		strcat(concat_aux,aux);
+		strcat(concat_aux,":");
+		if(!cloud_send_receive(t->cloud,"1",buffer_rx))
+			return 0;
+		moredata = buffer_rx[4];
+	}
+	/* Remanente de datos */
+	concat_aux = (char *)realloc(concat_aux,BUFFERSIZE*cant);
+	parce_data(buffer_rx,'|',&pos,aux);
+	strcat(concat_aux,aux);
+	cloud_send_receive(t->cloud,"1",buffer_rx);
+	free(concat_aux);
+	return 1;
+}
+
 int task_site_list(T_task *t){
 	/* Lista los sitios de una suscripcion en particular */
 	char buffer_tx[BUFFERSIZE];
@@ -222,8 +251,8 @@ int task_site_list(T_task *t){
 	printf("Listamos los sitios.\n");
 	if(t->status == T_TODO){
 		/* Es la primera vez que tratamos esta tarea */
-		sprintf(buffer_tx,"L|%s",dictionary_get(t->data,"susc_id"));
-		if(cloud_send_resive(c,buffer_tx,buffer_rx)){
+		sprintf(buffer_tx,"l|susc_id|%s",dictionary_get(t->data,"susc_id"));
+		if(cloud_send_receive(t->cloud,buffer_tx,buffer_rx)){
 			parce_data(buffer_rx,'|',&pos,value);
 			if(atoi(value) == 1){
 				parce_data(buffer_rx,'|',&pos,value);
@@ -236,9 +265,25 @@ int task_site_list(T_task *t){
 			t->status = T_DONE_ERROR;
 		}
 	} else if(t->status == T_WAITING){
-		/* Estamos esperando que el Controller retornara
- 		 * el resultado */
-		IMPLEMENTAR
+		/* Solicitamos al controller el estado del task */
+		sprintf(buffer_tx,"t|%s",dictionary_get(t->data,"c_task_id"));
+		if(cloud_send_receive(t->cloud,buffer_tx,buffer_rx)){
+			if(buffer_rx[0] == 'l'){
+				/* El task ha terminado del lado del controller */
+				if(buffer_rx[2] == '1'){
+					/* Almacenamos el resultado */
+					if(!task_store_result(t,buffer_rx[4]))
+						t->status = T_DONE_ERROR;
+					else {
+						/* Le damos formato json */
+						json_site_list(&(t->result),&(t->result_size));
+						t->status = T_DONE_OK;
+					}
+				} else {
+					t->status = T_DONE_ERROR;
+				}
+			}
+		}
 	}
 }
 
@@ -277,27 +322,28 @@ void task_run(T_task *t, T_db *db, T_list_cloud *cl){
 			case T_SUSC_MOD: task_susc_mod(t,db); break;
 		}
 	} else {
+		printf("Acciones sobre una nube\n");
 		/* Son acciones sobre alguna nube */
 		if(t->cloud == NULL){
 			/* Averiguamos la nube */
-			if( t-type <= T_SITE_DEL){
+			if( t->type <= T_SITE_DEL){
 				/* Acciones sobre una nube web */
-				dictionary_get(t->data,"susc_id",valor);
-				if(! db_get_cloud_id(db,valor,C_WEB,&cloud_id)){
+				valor = dictionary_get(t->data,"susc_id");
+				if(! db_get_cloud_id(db,atoi(valor),C_WEB,&cloud_id)){
 					printf("ERROR. Cloud no encontrada\n");
 				}
-				c = list_cloud_find_by_id(cl,cloud_id);
+				c = list_cloud_find_id(cl,cloud_id);
 				t->cloud = c;
 			}
+		}
 
-			switch(t->type){
-				/* SITES */
-				case T_SITE_LIST: task_site_list(t); break;
-				case T_SITE_SHOW: task_site_show(t); break;
-				case T_SITE_ADD: task_site_add(t); break;
-				case T_SITE_MOD: task_site_mod(t); break;
-				case T_SITE_DEL: task_site_del(t); break;
-			}
+		switch(t->type){
+			/* SITES */
+			case T_SITE_LIST: task_site_list(t); break;
+			case T_SITE_SHOW: task_site_show(t); break;
+			case T_SITE_ADD: task_site_add(t); break;
+			case T_SITE_MOD: task_site_mod(t); break;
+			case T_SITE_DEL: task_site_del(t); break;
 		}
 	}
 }

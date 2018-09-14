@@ -33,7 +33,7 @@ typedef struct t_r_server {
 	pthread_mutex_t mutex_heap_task;
 	pthread_mutex_t mutex_bag_task;
 	T_db *db;
-	T_list_cloud *l;
+	T_list_cloud *clouds;
 	} T_rest_server;
 
 /* Variables externas que se encuentran en controller.c,
