@@ -258,7 +258,7 @@ int task_site_list(T_task *t){
 		}
 	} else if(t->status == T_WAITING){
 		/* Solicitamos a la nube estado del task */
-		sprintf(send_message,"t%s",dictionary_get(t->data,"c_task_id"));
+		sprintf(send_message,"t%s\0",dictionary_get(t->data,"c_task_id"));
 		if(cloud_send_receive(t->cloud,send_message,strlen(send_message),&recv_message,&recv_message_size)){
 			if(recv_message[0] == '0'){
 				/* El task no ha terminado del lado de la nube */

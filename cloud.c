@@ -88,15 +88,20 @@ int cloud_send_receive(T_cloud *cloud, char *send_message, int send_message_size
 
 	//printf("cloud_send_receive- ENTROOO\n");
 	/* Enviar */
+	printf("Enviamos a la Nube: %i:%i - %s\n",BUFFER_SIZE,send_message_size,send_message);
+        send_message_size ++;         //contabilizamos el '\0' del final del string
 	while(c < send_message_size){
 		/* Hay que incluir un header de tamano HEADER_SIZE */
-		if((send_message_size - c + 2) < BUFFER_SIZE){
+		if((send_message_size - c + HEAD_SIZE) < BUFFER_SIZE){
+			printf("Entra en una transmision %i \n",send_message_size - c - HEAD_SIZE);
 			memcpy(buffer + HEAD_SIZE,p,send_message_size - c);
 			buffer[0] = '0';
 			c += send_message_size - c;
 		} else{
+			printf("Va a requerir una transmision mas\n");
 			memcpy(buffer + HEAD_SIZE,p,BUFFER_SIZE - HEAD_SIZE);
 			buffer[0] = '1';
+			printf("Va a requerir una transmision mas: %s\n",buffer);
 			c += BUFFER_SIZE - HEAD_SIZE;
 			p += c;
 		}
@@ -109,22 +114,20 @@ int cloud_send_receive(T_cloud *cloud, char *send_message, int send_message_size
 		/* Solo nos quedamos esperando confirmacion de mas datos
  		 * si emos enviado un 1 en el encabezado */
 		if(buffer[0] == '1'){
-			if(!recv(cloud->socket,buffer,BUFFER_SIZE,0)>0){
+			if(recv(cloud->socket,buffer,BUFFER_SIZE,0)<0){
 				cloud_change_status(cloud,C_UNKNOWN);
 				cloud_connect(cloud);
 				return 0;
 			}
 			printf("cloud_send_receive - Resive:-%s-\n",buffer);
-			if(buffer[0] == '0')
-				return 0;
 		}
 	}
 	//printf("Recibimos respuesta\n");
 	//sleep(10);
 	/* Recibir */
-	*rcv_size = 0;
 	fin = '1';
 	printf("cloud_send_receive: Ahora recibimos\n");
+	*rcv_size=-1;
 	while(fin == '1'){
 		if(recv(cloud->socket,buffer,BUFFER_SIZE,0)<0){
 			cloud_change_status(cloud,C_UNKNOWN);
@@ -132,9 +135,9 @@ int cloud_send_receive(T_cloud *cloud, char *send_message, int send_message_size
 			return 0;
 		}
 		printf("send_recive - recibido: %s\n",buffer);
-		pos = *rcv_size;
+		pos = *rcv_size + 1;
 		*rcv_size += BUFFER_SIZE - HEAD_SIZE;
-		*rcv_message=(char *)realloc(*rcv_message,*rcv_size * sizeof(char));
+		*rcv_message=(char *)realloc(*rcv_message,*rcv_size);
 		printf("Pasamos realloc\n");
 		memcpy(*rcv_message+pos,&(buffer[HEAD_SIZE]),BUFFER_SIZE - HEAD_SIZE);
 		printf("Pasamos memcpy\n");

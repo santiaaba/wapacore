@@ -8,7 +8,7 @@
 #ifndef CLOUD_H
 #define CLOUD_H
 
-#define BUFFER_SIZE	1024
+#define BUFFER_SIZE	25
 #define HEAD_SIZE	1
 
 typedef enum { C_WEB, C_MSSQMLDB, C_MYSQLDB} T_cloud_type;
