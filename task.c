@@ -69,10 +69,6 @@ void task_destroy(T_task **t){
 	free(*t);
 }
 
-char *task_get_result(T_task *t){
-	return t->result;
-}
-
 T_task_status task_get_status(T_task *t){
 	return t->status;
 }
@@ -212,72 +208,65 @@ int task_susc_list(T_task *t, T_db *db){
         t->status = T_DONE_OK;
 }
 
-int task_store_result_cloud(T_task *t, char moredata){
-	/* Almacena en ->data, el resultado en bruto obtenido por la nube */
-	char *buffer = NULL;
-	int buffer_size = 0;
+void task_json_result(T_task *t, char **result, int *result_size){
 
-	if(!cloud_send_receive(t->cloud,"1\0",1,&buffer,&buffer_size))
-		return 0;
-	t->result=(char *)realloc(t->result,buffer_size);
-	memcpy(t->result,buffer,buffer_size);
-	printf("Liberando buffer\n");
-	free(buffer);
-	printf("buffer liberado\n");
-	return 1;
+	char aux[20];
 
+	task_print_status(t, aux);
+	*result=(char *)realloc(*result,(t->result_size) + 200);
+	*result_size = t->result_size + 200;
+        sprintf(*result,"{\"taskid\":\"%s\",\"status\":\"%s\",\"data\":%s}",t->id,aux,t->result);
 }
+
 
 int task_site_list(T_task *t){
 	/* Lista los sitios de una suscripcion en particular */
-	char send_message[BUFFER_SIZE];
-	char *recv_message = NULL;
-	int recv_message_size = 0;
+	char send_message[100];
+	char *rcv_message = NULL;
+	char *json_data;
+	int json_data_size;
+	uint32_t rcv_message_size = 0;
 	int pos;
 	char value[200];
 
-	printf("Listamos los sitios.\n");
 	if(t->status == T_TODO){
 		/* Es la primera vez que tratamos esta tarea */
 		sprintf(send_message,"lsusc_id|%s",dictionary_get(t->data,"susc_id"));
-		if(cloud_send_receive(t->cloud,send_message,strlen(send_message),&recv_message,&recv_message_size)){
-			printf("Ahora hay que almacenar la tarea %p\n",recv_message);
+		// pasamos el tamano del mensaje +1 para incluir el '\0'
+		if(cloud_send_receive(t->cloud,send_message,strlen(send_message)+1,&rcv_message,&rcv_message_size)){
 			pos=1;
-			parce_data(recv_message,'|',&pos,value);
-			printf("El task_id es: %s\n",value);
-			if(recv_message[0] == '1'){
+			parce_data(rcv_message,'|',&pos,value);
+			printf("El task_id de la nube es: -%s-\n",value);
+			if(rcv_message[0] == '1'){
 				dictionary_add(t->data,"c_task_id",value);
 				t->status = T_WAITING;
 			} else {
 				dictionary_add(t->data,"error_message",value);
 				t->status = T_DONE_ERROR;
 			}
-			printf("COOOONTINUAMOS\n");
 		} else {
 			t->status = T_DONE_ERROR;
 		}
 	} else if(t->status == T_WAITING){
 		/* Solicitamos a la nube estado del task */
 		sprintf(send_message,"t%s\0",dictionary_get(t->data,"c_task_id"));
-		if(cloud_send_receive(t->cloud,send_message,strlen(send_message),&recv_message,&recv_message_size)){
-			if(recv_message[0] == '0'){
+		if(cloud_send_receive(t->cloud,send_message,strlen(send_message),&rcv_message,&rcv_message_size)){
+			printf("Resultado obtenido por la nube: %c\n",rcv_message[0]);
+			if(rcv_message[0] == '0'){
 				/* El task no ha terminado del lado de la nube */
-			} else if(recv_message[0] == '1'){
-				/* El task ha terminado del lado de la nube */
-				if(!task_store_result_cloud(t,recv_message[4])){
-					t->status = T_DONE_ERROR;
-				} else {
-					json_site_list(&(t->result),&(t->result_size));
-					t->status = T_DONE_OK;
-				}
+			} else if(rcv_message[0] == '1'){
+				t->result=(char *)realloc(t->result,rcv_message_size);
+				memcpy(t->result,&rcv_message[1],rcv_message_size-1);
+				t->result_size = rcv_message_size;
+				t->status = T_DONE_OK;
 			} else {
 				/* task no existe en la nube */
 				t->status = T_DONE_ERROR;
 			}
 		}
 	}
-	free(recv_message);
-	sleep(10);
+	task_print_status(t,value);
+	free(rcv_message);
 }
 
 int task_site_show(T_task *t){
@@ -409,11 +398,13 @@ void heap_task_print(T_heap_task *h){
 
 	heap_t_node *aux;
 
+	printf("PRINT BAG\n");
 	aux = h->first;
 	while(aux!= NULL){
 		printf("Job_ID: %s\n",task_get_id(aux->data));
 		aux = aux->next;
 	}
+	printf("END PRINT BAG\n");
 }
 
 /******************************

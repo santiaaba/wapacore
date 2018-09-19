@@ -1,5 +1,13 @@
 #include "cloud.h"
 
+void int_to_4bytes(uint32_t *i, char *_4bytes){
+        memcpy(_4bytes,i,4);
+}
+
+void _4bytes_to_int(char *_4bytes, uint32_t *i){
+        memcpy(i,_4bytes,4);
+}
+
 /************************
  * 	CLOUD		*
  ************************/
@@ -71,86 +79,65 @@ int cloud_end_connect(T_cloud *c){
 	close(c->socket);
 }
 
-int cloud_send_receive(T_cloud *cloud, char *send_message, int send_message_size,
-			char **rcv_message, int *rcv_size){
-	/* Envia una instruccion que puede superar una transmision y recebe la
- 	 * respuesta a la misma */
+int cloud_send_receive(T_cloud *cloud, char *send_message, uint32_t send_message_size,
+			char **rcv_message, uint32_t *rcv_message_size){
 
 	char buffer[BUFFER_SIZE];
+	char printB[BUFFER_SIZE+1];
+	uint32_t parce_size;
+	int first_message=1;
 	int pos;
-	char *p;
-	char fin;
-	int c;
+	uint32_t c=0;	//cantidad de datos enviados o recibidos
 
-	/* El envio puede que conlleve varias transmisiones */
-	p = send_message;
-	c = 0;
+	printf("SEND-------SEND----SEND-----\n");
+	printf("Mensaje a la Nube. BUFFER_SIZE=%i , send_message_size=:%i, send_message=%s\n",BUFFER_SIZE,send_message_size,send_message);
+	/* Los 4 primeros bytes del header es el tamano total del mensaje */
+	int_to_4bytes(&send_message_size,buffer);
 
-	//printf("cloud_send_receive- ENTROOO\n");
-	/* Enviar */
-	printf("Enviamos a la Nube: %i:%i - %s\n",BUFFER_SIZE,send_message_size,send_message);
-        send_message_size ++;         //contabilizamos el '\0' del final del string
 	while(c < send_message_size){
 		/* Hay que incluir un header de tamano HEADER_SIZE */
-		if((send_message_size - c + HEAD_SIZE) < BUFFER_SIZE){
-			printf("Entra en una transmision %i \n",send_message_size - c - HEAD_SIZE);
-			memcpy(buffer + HEAD_SIZE,p,send_message_size - c);
-			buffer[0] = '0';
-			c += send_message_size - c;
-		} else{
-			printf("Va a requerir una transmision mas\n");
-			memcpy(buffer + HEAD_SIZE,p,BUFFER_SIZE - HEAD_SIZE);
-			buffer[0] = '1';
-			printf("Va a requerir una transmision mas: %s\n",buffer);
-			c += BUFFER_SIZE - HEAD_SIZE;
-			p += c;
+		if(send_message_size - c + HEADER_SIZE < BUFFER_SIZE){
+			/* Entra todo en el buffer */
+			parce_size = send_message_size - c ;
+		} else {
+			/* No entra todo en el buffer */
+			parce_size = BUFFER_SIZE - HEADER_SIZE;
 		}
-		printf("cloud_send_receive - SEND:-%s-\n",buffer);
-		if(!send(cloud->socket,buffer,BUFFER_SIZE,0)){
+		int_to_4bytes(&parce_size,&(buffer[4]));
+		memcpy(buffer + HEADER_SIZE,send_message + c,parce_size);
+		c += parce_size;
+		if(send(cloud->socket,buffer,BUFFER_SIZE,0)<0){
 			cloud_change_status(cloud,C_UNKNOWN);
 			cloud_connect(cloud);
 			return 0;
 		}
-		/* Solo nos quedamos esperando confirmacion de mas datos
- 		 * si emos enviado un 1 en el encabezado */
-		if(buffer[0] == '1'){
-			if(recv(cloud->socket,buffer,BUFFER_SIZE,0)<0){
-				cloud_change_status(cloud,C_UNKNOWN);
-				cloud_connect(cloud);
-				return 0;
-			}
-			printf("cloud_send_receive - Resive:-%s-\n",buffer);
-		}
 	}
-	//printf("Recibimos respuesta\n");
-	//sleep(10);
+
 	/* Recibir */
-	fin = '1';
-	printf("cloud_send_receive: Ahora recibimos\n");
-	*rcv_size=-1;
-	while(fin == '1'){
+	c=0;
+	/* Al menos una recepcion esperamos recibir */
+	printf("RECEIV-------RECEIV-------RECEIV-----\n");
+	int_to_4bytes(&c,buffer);
+	int_to_4bytes(&c,&(buffer[4]));
+	do{
 		if(recv(cloud->socket,buffer,BUFFER_SIZE,0)<0){
 			cloud_change_status(cloud,C_UNKNOWN);
 			cloud_connect(cloud);
 			return 0;
 		}
-		printf("send_recive - recibido: %s\n",buffer);
-		pos = *rcv_size + 1;
-		*rcv_size += BUFFER_SIZE - HEAD_SIZE;
-		*rcv_message=(char *)realloc(*rcv_message,*rcv_size);
-		printf("Pasamos realloc\n");
-		memcpy(*rcv_message+pos,&(buffer[HEAD_SIZE]),BUFFER_SIZE - HEAD_SIZE);
-		printf("Pasamos memcpy\n");
-		fin = buffer[0];
-		/* Solo enviamos confirmacion de resepcion de mas datos
- 		 * si hemos recibido un 1 en el encabezado */
-		if(fin == '1'){
-			printf("FIN ES 1!!!!!\n");
-			send(cloud->socket,"1\0", BUFFER_SIZE,0);
+		/* Del header obtenemos el tamano de los datos que
+ 		 * recibiremos */
+		if(first_message){
+			first_message=0;
+			_4bytes_to_int(buffer,rcv_message_size);
+			*rcv_message=(char *)realloc(*rcv_message,*rcv_message_size);
 		}
-	}
-	printf("Mensaje completo: %s\n",*rcv_message);
-	//sleep(10);
+
+		_4bytes_to_int(&(buffer[4]),&parce_size);
+		memcpy(*rcv_message+c,&(buffer[HEADER_SIZE]),parce_size);
+		c += parce_size;
+	} while (c < *rcv_message_size);
+	printf("RECEIV completo: %s\n",*rcv_message);
 	return 1;
 }
 

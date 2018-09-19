@@ -13,5 +13,4 @@ int json_task(char *status, char *id, char *result, char **message, unsigned int
 int json_susc_list(char **data, int *size, MYSQL_RES *result);
 int json_susc_show(char **data, int *size, MYSQL_RES *result);
 
-void json_site_list(char **data, int *size);
 #endif

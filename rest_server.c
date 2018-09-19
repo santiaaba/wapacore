@@ -63,7 +63,8 @@ void *rest_server_do_task(void *param){
 	T_rest_server *r= (T_rest_server *)param;
 
 	while(1){
-		sleep(3);
+		printf("Esperamos 20 segundos antes de ejecutar el siguiente task en la cola\n");
+		sleep(10);
 		pthread_mutex_lock(&(r->mutex_heap_task));
 			task = heap_task_pop(&(r->tasks_todo));
 			printf("DO_TASK - %s\n",task_get_id(task));
@@ -101,7 +102,7 @@ static int send_page(struct MHD_Connection *connection, const char *page){
 	return ret;
 }
 
-void rest_server_get_task(T_rest_server *r, T_taskid *taskid, char **message, unsigned int *size){
+void rest_server_get_task(T_rest_server *r, T_taskid *taskid, char **message, unsigned int *message_size){
 	T_task *task = NULL;
 	char status[30];
 	unsigned int total_size;
@@ -112,9 +113,13 @@ void rest_server_get_task(T_rest_server *r, T_taskid *taskid, char **message, un
 	printf("Buscadno TASK ID: %s\n",taskid);
 	/* Buscamos en la bolsa de tareas finalizadas. Si la encontramos,
  	   bag_task_print la quita de la estructura bag. */
+	printf("Bolsa de terminados\n");
 	bag_task_print(&(r->tasks_done));
+	printf("-------------------------------\n");
+	printf("Cola de en espera\n");
+	heap_task_print(&(r->tasks_todo));
+	printf("-------------------------------\n");
 	task = bag_task_pop(&(r->tasks_done),taskid);
-	printf("PASO %p\n",task);
 	if(task == NULL){
 		printf("No esta en la bolsa de terminados. La buscamos en la cola de pendientes\n");
 		/* Buscamos entonces en la cola de pendientes. En este caso
@@ -128,7 +133,7 @@ void rest_server_get_task(T_rest_server *r, T_taskid *taskid, char **message, un
 	} else {
 		/* Armamos en message el resultado de la terea */
 		task_print_status(task,status);
-		json_task(status,task_get_id(task),task_get_result(task),message,size);
+		task_json_result(task,message,message_size);
 
 		/* Destruimos el task si este ya a finalizado */
 		if(task_get_status(task) > T_WAITING)

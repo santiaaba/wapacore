@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/types.h>
@@ -9,7 +10,7 @@
 #define CLOUD_H
 
 #define BUFFER_SIZE	25
-#define HEAD_SIZE	1
+#define HEADER_SIZE	8
 
 typedef enum { C_WEB, C_MSSQMLDB, C_MYSQLDB} T_cloud_type;
 typedef enum { C_ONLINE, C_OFFLINE, C_PREPARED, C_BROKEN, C_UNKNOWN} T_cloud_status;
@@ -42,7 +43,7 @@ char *cloud_get_user(T_cloud *c);
 char *cloud_get_pass(T_cloud *c);
 int cloud_connect(T_cloud *c);
 int cloud_end_connect(T_cloud *c);
-int cloud_send_receive(T_cloud *c, char *send_message, int send_message_size, char **rcv_message, int *rcv_size);
+int cloud_send_receive(T_cloud *c, char *send_message, uint32_t send_message_size, char **rcv_message, uint32_t *rcv_size);
 
 /************************
  *      LIST CLOUD      *

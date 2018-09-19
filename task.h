@@ -87,7 +87,7 @@ T_tasktoken *task_get_token(T_task *t);
 void task_print_status(T_task *t, char *s);
 char *task_get_id(T_task *t);
 T_task_status task_get_status(T_task *t);
-char *task_get_result(T_task *t);
+void task_json_result(T_task *t, char **result, int *result_size);
 
 /* USERS */
 int task_user_list(T_task *t, T_db *db);
