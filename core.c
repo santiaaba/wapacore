@@ -4,6 +4,25 @@
 #include "cloud.h"
 
 /********************************
+ *      Funciones               *
+ ********************************/
+
+void check_clouds(T_list_cloud *clouds){
+
+	T_cloud *cloud;
+
+	list_cloud_first(clouds);
+	while(!list_cloud_eol(clouds)){
+		cloud = list_cloud_get(clouds);
+		printf("Revisando cloud: %s\n",cloud_get_name(cloud));
+		if(cloud_check(cloud)){
+			printf("cloud ha cambiado de estado\n");
+		}
+		list_cloud_next(clouds);
+	}
+}
+
+/********************************
  *      Variables GLOBALES      *
  ********************************/
 T_config config;
@@ -45,6 +64,7 @@ void main(){
 
 	while(1){
 		/* Revisamos estado de las nubes */
+		//check_clouds(&clouds);
 		sleep(2);
 	}
 }

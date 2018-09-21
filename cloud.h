@@ -11,6 +11,7 @@
 
 #define BUFFER_SIZE	25
 #define HEADER_SIZE	8
+#define TIMEONLINE	20
 
 typedef enum { C_WEB, C_MSSQMLDB, C_MYSQLDB} T_cloud_type;
 typedef enum { C_ONLINE, C_OFFLINE, C_PREPARED, C_BROKEN, C_UNKNOWN} T_cloud_status;
@@ -42,6 +43,7 @@ char *cloud_get_ipv4(T_cloud *c);
 char *cloud_get_user(T_cloud *c);
 char *cloud_get_pass(T_cloud *c);
 int cloud_connect(T_cloud *c);
+int cloud_check(T_cloud *c);
 int cloud_end_connect(T_cloud *c);
 int cloud_send_receive(T_cloud *c, char *send_message, uint32_t send_message_size, char **rcv_message, uint32_t *rcv_size);
 

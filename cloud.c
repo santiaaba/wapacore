@@ -48,11 +48,6 @@ char *cloud_get_pass(T_cloud *c){
 }
 
 void cloud_change_status(T_cloud *c, T_cloud_status s){
-	/* funcion de uso interno */
-	/* Retorna 1 si cambio el estado. 0 en caso contrario */
-	char aux[100];
-	char aux2[100];
-
 	/* Solo actualizamos el estado si es distinto
 	* del que ya posee */
 	if(c->status != s){
@@ -79,6 +74,38 @@ int cloud_end_connect(T_cloud *c){
 	close(c->socket);
 }
 
+int cloud_check(T_cloud *c){
+	char *rcv_message;
+	uint32_t rcv_message_size;
+
+	if(cloud_send_receive(c,"c\0",2,&rcv_message,&rcv_message_size)){
+		if(rcv_message[0] != 1){
+			if(c->status == C_BROKEN || c->status == C_UNKNOWN){
+				cloud_change_status(c,C_PREPARED);
+			} else {
+				if((c->status == C_PREPARED) &&
+				((unsigned long)time(0) - c->time_change_status) > TIMEONLINE){
+					/* Responde, pasa el chequeo,
+ 					   ya estaba en PREPARED y paso el tiempo */
+					cloud_change_status(c,C_ONLINE);
+				}
+			
+			}
+		} else {
+			printf("cloud %s ROTO!\n",cloud_get_name(c));
+			cloud_change_status(c,C_BROKEN);
+		}
+	} else {
+		printf("cloud %s NO RESPONDE!\n",cloud_get_name(c));
+	}
+	if (c->is_changed){
+		c->is_changed = 0;
+		return 1;
+	} else {
+		return 0;
+	}
+}
+
 int cloud_send_receive(T_cloud *cloud, char *send_message, uint32_t send_message_size,
 			char **rcv_message, uint32_t *rcv_message_size){
 
@@ -88,6 +115,11 @@ int cloud_send_receive(T_cloud *cloud, char *send_message, uint32_t send_message
 	int first_message=1;
 	int pos;
 	uint32_t c=0;	//cantidad de datos enviados o recibidos
+
+	if( send_message[send_message_size-1] != '\0'){
+		printf("cloud_send_receive: ERROR. send_message no termina en \\0");
+		return 0;
+	}
 
 	printf("SEND-------SEND----SEND-----\n");
 	printf("Mensaje a la Nube. BUFFER_SIZE=%i , send_message_size=:%i, send_message=%s\n",BUFFER_SIZE,send_message_size,send_message);
