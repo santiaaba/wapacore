@@ -76,6 +76,7 @@ typedef struct {
 	T_task_status status;		//estado del task
 	T_dictionary *data;		//datos necesarios para realizar la accion
 	T_cloud *cloud;			//Cuando interviene una nube... queda asignada
+	T_cloud_type cloud_type;
 	char *result;			//resultado en formato json para retornar.
 	unsigned int result_size;	//datos para realizar la accion
 } T_task;

@@ -1,5 +1,25 @@
 #include "db.h"
 
+void random_dir(char *dir){
+	/* Genera un dir y sub dir de dos digitos cada uno */
+	char *string = "0123456789";
+	int i,j;
+
+	for(j=0;j<5;j++){
+		if(j==2){
+			dir[j]='/';
+		} else {
+			i = rand() % 10;
+			dir[j] = string[i];
+		}
+	}
+	dir[5]='\0';
+}
+
+/******************************
+ * 	T_DB
+ ******************************/
+
 void db_init(T_db *db){
 	db->con = mysql_init(NULL);
 }
@@ -51,6 +71,8 @@ int db_get_cloud_id(T_db *db, int susc_id, T_cloud_type t, int *cloud_id){
 
 	sprintf(sql,"select n.id from nube n inner join plan_nube p on (n.id = p.id_nube) inner join plan pp on (p.id_plan = pp.id) inner join suscription s on (pp.id = s.plan_id) where s.id=%i and n.tipo=%i",susc_id,t);
 
+	printf("Buscando cloud %s\n",sql);
+
 	mysql_query(db->con,sql);
 	result = mysql_store_result(db->con);
 	row = mysql_fetch_row(result);
@@ -59,6 +81,24 @@ int db_get_cloud_id(T_db *db, int susc_id, T_cloud_type t, int *cloud_id){
 		return 1;
 	} else {
 		return 0;
+	}
+}
+
+int db_susc_exist(T_db *db, T_dictionary *d, char *message){
+	/* Indica si una suscripcion existe */
+	char sql[100];
+	MYSQL_RES *result;
+        MYSQL_ROW row;
+
+	sprintf(sql,"select count(id) from suscription where id=%s and user_id=%s",
+		dictionary_get(d,"susc_id"),dictionary_get(d,"user_id"));
+	result = mysql_store_result(db->con);
+	row = mysql_fetch_row(result);
+        if(atoi(row[0]) >  0){
+                strcpy(message,"'Suscripcion inexistente'");
+                return 0;
+        } else {
+		return 1;
 	}
 }
 
@@ -215,12 +255,15 @@ int db_susc_add(T_db *db, T_dictionary *d, char *message){
 	MYSQL_RES *result;
 	MYSQL_ROW row;
 	char sql[100];
+	char hash_dir[6];
 	char plan_name[100];
 	int max;
+	my_ulonglong susc_id;
 
 	printf("DB ALTA de suscripcion\n");
 	// Verificamos la existencia del usuario
 	sprintf(sql,"select id,status from user where id=%s",dictionary_get(d,"user_id"));
+	printf("Existencia usuario: %s\n",sql);
 	mysql_query(db->con,sql);
 	result = mysql_store_result(db->con);
 	if(!result){
@@ -230,13 +273,14 @@ int db_susc_add(T_db *db, T_dictionary *d, char *message){
 	}
 	// Verificamos que el usuario este activo
 	row = mysql_fetch_row(result);
-	if(row[1] > 0){
+	if(atoi(row[1]) > 0){
 		strcpy(message,"'Usuario no esta activo'");
 		return 0;
 	}
 	
 	// Verificamos la existencia del plan
 	sprintf(sql,"select id,status,max,name from plan where id=%s",dictionary_get(d,"plan_id"));
+	printf("Existencia plan: %s\n",sql);
 	mysql_free_result(result);
 	mysql_query(db->con,sql);
 	result = mysql_store_result(db->con);
@@ -247,7 +291,7 @@ int db_susc_add(T_db *db, T_dictionary *d, char *message){
 	}
 	// Verificamos que el plan este instanciable
 	row = mysql_fetch_row(result);
-	if(row[1] > 0){
+	if(atoi(row[1]) > 0){
 		strcpy(message,"'Plan no instanciable'");
 		return 0;
 	} else {
@@ -258,6 +302,7 @@ int db_susc_add(T_db *db, T_dictionary *d, char *message){
 	// Verificamos que el usuario no supere la cantidad de instancias del mismo plan
 	sprintf(sql,"select count(*) from suscription where user_id=%s and plan_id=%s",
 		dictionary_get(d,"user_id"),dictionary_get(d,"plan_id"));
+	printf("MAX plan:%s\n",sql);
 	mysql_free_result(result);
 	mysql_query(db->con,sql);
 	result = mysql_store_result(db->con);
@@ -267,12 +312,29 @@ int db_susc_add(T_db *db, T_dictionary *d, char *message){
 	}
 
 	// Paso todos los chequeos. Lo damos de alta
-	sprintf(sql,"insert into suscription(user_id,plan_id,name,satus) values(%s,%s,'%s',0)",
+	sprintf(sql,"insert into suscription(user_id,plan_id,name,status) values(%s,%s,'%s',0)",
 	dictionary_get(d,"user_id"),dictionary_get(d,"plan_id"),plan_name);
+	printf("inser suscription:%s\n",sql);
+	susc_id = mysql_insert_id(db->con);
 	if(0 != mysql_query(db->con,sql)){
 		strcpy(message,"'Error FATAL'");
 		return 0;
 	}
+
+	// Damos de alta si corresponde la parte weebsites
+	random_dir(hash_dir);
+	sprintf(sql,"insert into web_suscription(id,hash_dir) values(%lu,'%s')",susc_id,hash_dir);
+	printf("inser suscription web:%s\n",sql);
+	if(0 != mysql_query(db->con,sql)){
+		strcpy(message,"'Error FATAL'");
+		return 0;
+	}
+	// Damos de alta si corresponde la parte MySQL_DB
+	// IMPLEMENTAR
+	
+	// Damos de alta si corresponde la parte MSSQL_DB
+	// IMPLEMENTAR
+	//
 	return 1;
 }
 
@@ -326,9 +388,28 @@ int db_susc_del(T_db *db, T_dictionary *d, char *message){
 	printf("DB ELIMINAR suscripcion\n");
 	dictionary_print(d);
 
-	/* Eliminado nube webhosting */
-	/* Eliminado nube mysqlDB */
-	/* Eliminado nube MSsqlDB */
+	/* Eliminado suscripcion webhosting*/
+	sprintf(sql,"delete from web_suscription where id=%s",dictionary_get(d,"susc_id"));
+	printf(sql);
+	if(0 != mysql_query(db->con,sql)){
+		strcpy(message,"'Error FATAL'");
+		return 0;
+	}
+	/* Eliminado suscripcion mysqlDB*/
+	sprintf(sql,"delete from mysqldb_suscription where id=%s",dictionary_get(d,"susc_id"));
+	printf(sql);
+	if(0 != mysql_query(db->con,sql)){
+		strcpy(message,"'Error FATAL'");
+		return 0;
+	}
+	/* Eliminado suscripcion MSsqlDB*/
+	sprintf(sql,"delete from mssqldb_suscription where id=%s",dictionary_get(d,"susc_id"));
+	printf(sql);
+	if(0 != mysql_query(db->con,sql)){
+		strcpy(message,"'Error FATAL'");
+		return 0;
+	}
+
 	/* Eliminado suscripcion */
 	sprintf(sql,"delete from suscription where id=%s",dictionary_get(d,"susc_id"));
 	printf(sql);

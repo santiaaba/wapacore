@@ -117,7 +117,7 @@ int cloud_send_receive(T_cloud *cloud, char *send_message, uint32_t send_message
 	uint32_t c=0;	//cantidad de datos enviados o recibidos
 
 	if( send_message[send_message_size-1] != '\0'){
-		printf("cloud_send_receive: ERROR. send_message no termina en \\0");
+		printf("cloud_send_receive: ERROR. send_message no termina en \\0\n");
 		return 0;
 	}
 

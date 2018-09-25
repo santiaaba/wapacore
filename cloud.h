@@ -13,7 +13,7 @@
 #define HEADER_SIZE	8
 #define TIMEONLINE	20
 
-typedef enum { C_WEB, C_MSSQMLDB, C_MYSQLDB} T_cloud_type;
+typedef enum { C_NONE, C_WEB, C_MSSQLDB, C_MYSQLDB} T_cloud_type;
 typedef enum { C_ONLINE, C_OFFLINE, C_PREPARED, C_BROKEN, C_UNKNOWN} T_cloud_status;
 
 /************************

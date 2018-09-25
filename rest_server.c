@@ -42,6 +42,14 @@ int check_data_susc_mod(T_dictionary *data, char *result){
 	return 1;
 }
 
+int check_data_site_mod(T_dictionary *data, char *result){
+	return 1;
+}
+
+int check_data_site_add(T_dictionary *data, char *result){
+	return 1;
+}
+
 void rest_server_add_task(T_rest_server *r, T_task *j){
 	printf("Agregamos el JOB: %s a la lista\n",task_get_id(j));
 
@@ -179,7 +187,7 @@ static int handle_POST(struct MHD_Connection *connection,
 		} else {
 			printf("alta de un plan\n");
 			if(ok = check_data_plan_add(con_info->data,result))
-				task_init(task,&token,T_PLAN_ADD,con_info->data);
+				task_init(task,&token,T_PLAN_ADD, con_info->data);
 		}
 	/* PARA LOS USUARIOS */
 	} else if(0 == strcmp("users",value)){
@@ -193,10 +201,28 @@ static int handle_POST(struct MHD_Connection *connection,
 					parce_data((char *)url,'/',&pos,value);
 					if(strlen(value)>0){
 						dictionary_add(con_info->data,"susc_id",value);
-						if(ok = check_data_susc_mod(con_info->data,result))
-							task_init(task,&token,T_SUSC_MOD,con_info->data);
-						else
-							rest_server_error(result,&ok);
+						parce_data((char *)url,'/',&pos,value);
+						if(0 == strcmp("sites",value)){
+							parce_data((char *)url,'/',&pos,value);
+							if(strlen(value)>0){
+								dictionary_add(con_info->data,"site_id",value);
+								if(ok = check_data_site_mod(con_info->data,result))
+									task_init(task,&token,T_SITE_MOD,con_info->data);
+								else
+									rest_server_error(result,&ok);
+							} else {
+								if(ok = check_data_site_add(con_info->data,result))
+									task_init(task,&token,T_SITE_ADD,con_info->data);
+								else
+									rest_server_error(result,&ok);
+							}
+						} else {
+							dictionary_add(con_info->data,"susc_id",value);
+							if(ok = check_data_susc_mod(con_info->data,result))
+								task_init(task,&token,T_SUSC_MOD,con_info->data);
+							else
+								rest_server_error(result,&ok);
+						}
 					} else {
 						/* ALTA SUSCRIPCIONES */
 						if(ok = check_data_susc_add(con_info->data,result))
@@ -281,9 +307,21 @@ static int handle_DELETE(struct MHD_Connection *connection, const char *url){
 				if(0 == strcmp("susc",value)) {
 					parce_data((char *)url,'/',&pos,value);
 					if(strlen(value)>0){
-						/* BORRADO SUSCRIPCION */
 						dictionary_add(data,"susc_id",value);
-						task_init(task,&token,T_SUSC_DEL,data);
+						parce_data((char *)url,'/',&pos,value);
+						if(0 == strcmp("sites",value)) {
+							parce_data((char *)url,'/',&pos,value);
+							if(strlen(value)>0) {
+								/* BORRADO SITIO */
+								dictionary_add(data,"site_id",value);
+								task_init(task,&token,T_SITE_DEL,data);
+							} else {
+								rest_server_error(result,&ok);
+							}
+						} else {
+							/* BORRADO SUSCRIPCION */
+							task_init(task,&token,T_SUSC_DEL,data);
+						}
 					} else {
 						rest_server_error(result,&ok);
 					}

@@ -34,4 +34,6 @@ void db_susc_list(T_db *db, char *user_id, MYSQL_RES **result);
 void db_susc_show(T_db *db, char *susc_id, MYSQL_RES **result);
 int db_susc_add(T_db *db, T_dictionary *d, char *message);
 int db_susc_mod(T_db *db, T_dictionary *d, char *message);
+int db_susc_exist(T_db *db, T_dictionary *d, char *message);
+int db_susc_del(T_db *db, T_dictionary *d, char *message);
 #endif
