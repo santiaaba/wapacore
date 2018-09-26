@@ -76,7 +76,9 @@ typedef struct {
 	T_task_status status;		//estado del task
 	T_dictionary *data;		//datos necesarios para realizar la accion
 	T_cloud *cloud;			//Cuando interviene una nube... queda asignada
-	T_cloud_type cloud_type;
+	int step;			// Para acciones que involucran mas de un paso... indica el paso
+	//T_cloud_type cloud_type;	//tipo de nube
+	int result_code;		//codigo obtenido de la nube
 	char *result;			//resultado en formato json para retornar.
 	unsigned int result_size;	//datos para realizar la accion
 } T_task;
@@ -85,25 +87,11 @@ void task_init(T_task *t, T_tasktoken *token, T_task_type type, T_dictionary *da
 void task_destroy(T_task **t);
 void task_run(T_task *t, T_db *db, T_list_cloud *cl);
 T_tasktoken *task_get_token(T_task *t);
+void task_set_result(T_task *t, char *message);
 void task_print_status(T_task *t, char *s);
 char *task_get_id(T_task *t);
 T_task_status task_get_status(T_task *t);
 void task_json_result(T_task *t, char **result, int *result_size);
-
-/* USERS */
-int task_user_list(T_task *t, T_db *db);
-int task_user_show(T_task *t, T_db *db);
-int task_user_add(T_task *t, T_db *db);
-
-/* SUSCRIPTION */
-int task_susc_add(T_task *t, T_db *db);
-
-/* Sites */
-int task_site_list(T_task *t);
-int task_site_show(T_task *t);
-int task_site_add(T_task *t);
-int task_site_del(T_task *t);
-int task_site_mod(T_task *t);
 
 /*****************************
          Cola de tareas

@@ -10,7 +10,6 @@ int dictionary_add(T_dictionary *d, char *key, char *value){
         dictionary_node *aux;
 	int exist=0;
 
-	printf("Agregamos al diccionario: %s = %s\n",key,value);
 	aux = d->first;
 	while(!exist && aux != NULL){
 		if(strcmp(aux->key,key) == 0) exist=1;
@@ -58,7 +57,6 @@ void dictionary_destroy(T_dictionary **d){
 	
 	while((*d)->first!=NULL){
 		aux = (*d)->first;
-		printf("Eliminamos del diccionario: %s = %s\n",aux->key,aux->value);
 		free(aux->key);
 		free(aux->value);
 		(*d)->first = (*d)->first->next;

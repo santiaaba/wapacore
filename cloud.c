@@ -74,9 +74,13 @@ int cloud_end_connect(T_cloud *c){
 	close(c->socket);
 }
 
+T_cloud_type cloud_get_type(T_cloud *c){
+	return c->type;
+}
+
 int cloud_check(T_cloud *c){
-	char *rcv_message;
-	uint32_t rcv_message_size;
+	char *rcv_message = NULL;
+	uint32_t rcv_message_size = 0;
 
 	if(cloud_send_receive(c,"c\0",2,&rcv_message,&rcv_message_size)){
 		if(rcv_message[0] != 1){
