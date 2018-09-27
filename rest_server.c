@@ -4,35 +4,111 @@ int check_data_plan_add(T_dictionary *data, char *result){
 	return 1;
 }
 
+int check_user_show(T_dictionary *data, char *result){
+	if(!valid_id(dictionary_get(data,"user_id"))){
+                strcpy(result,"{\"task\":\"\",\"stauts\":\"ERROR\",\"data\":\"Id usuario invalido\"}");
+                return 0;
+        }
+	return 1;
+}
+
+int check_susc_show(T_dictionary *data, char *result){
+	if(!valid_id(dictionary_get(data,"susc_id"))){
+                strcpy(result,"{\"task\":\"\",\"stauts\":\"ERROR\",\"data\":\"Id suscripcion invalido\"}");
+                return 0;
+        }
+	return 1;
+}
+
+int check_susc_list(T_dictionary *data, char *result){
+	if(!valid_id(dictionary_get(data,"susc_id"))){
+                strcpy(result,"{\"task\":\"\",\"stauts\":\"ERROR\",\"data\":\"Id suscripcion invalido\"}");
+                return 0;
+        }
+	if(!valid_id(dictionary_get(data,"user_id"))){
+                strcpy(result,"{\"task\":\"\",\"stauts\":\"ERROR\",\"data\":\"Id usuario invalido\"}");
+                return 0;
+        }
+	return 1;
+}
+
+int check_site_show(T_dictionary *data, char *result){
+	if(!valid_id(dictionary_get(data,"susc_id"))){
+                strcpy(result,"{\"task\":\"\",\"stauts\":\"ERROR\",\"data\":\"Id suscripcion invalido\"}");
+                return 0;
+        }
+	if(!valid_id(dictionary_get(data,"user_id"))){
+                strcpy(result,"{\"task\":\"\",\"stauts\":\"ERROR\",\"data\":\"Id usuario invalido\"}");
+                return 0;
+        }
+	return 1;
+	if(!valid_id(dictionary_get(data,"site_id"))){
+                strcpy(result,"{\"task\":\"\",\"stauts\":\"ERROR\",\"data\":\"Id sitio invalido\"}");
+                return 0;
+        }
+	return 1;
+}
+
+int check_site_list(T_dictionary *data, char *result){
+	if(!valid_id(dictionary_get(data,"susc_id"))){
+                strcpy(result,"{\"task\":\"\",\"stauts\":\"ERROR\",\"data\":\"Id suscripcion invalido\"}");
+                return 0;
+        }
+	if(!valid_id(dictionary_get(data,"user_id"))){
+                strcpy(result,"{\"task\":\"\",\"stauts\":\"ERROR\",\"data\":\"Id usuario invalido\"}");
+                return 0;
+        }
+	return 1;
+}
+
 int check_data_user_add(T_dictionary *data, char *result){
-	/* Verificamos existencia parametros */
-	if(dictionary_get(data,"name") == NULL){
-		strcpy(result,"Falta parametro name");
+	/* Verifica que los parametros esten todos y que
+ 	 * tengan un formato correcto. En *result retorna
+ 	 * el error en formato json de ser necesario. */
+	if(!valid_user_name(dictionary_get(data,"name"))){
+		strcpy(result,"{\"task\":\"\",\"stauts\":\"ERROR\",\"data\":\"Nombre usuario invalido\"}");
 		return 0;
 	}
-	if(dictionary_get(data,"pass") == NULL){
-		strcpy(result,"Falta parametro pass");
+	if(!valid_pass(dictionary_get(data,"pass"))){
+		strcpy(result,"{\"task\":\"\",\"stauts\":\"ERROR\",\"data\":\"Password invalida\"}");
 		return 0;
 	}
-	if(dictionary_get(data,"email") == NULL){
-		strcpy(result,"Falta parametro email");
+	if(!valid_email(dictionary_get(data,"email"))){
+		strcpy(result,"{\"task\":\"\",\"stauts\":\"ERROR\",\"data\":\"email invalido\"}");
 		return 0;
 	}
 	return 1;
 }
 
 int check_data_user_mod(T_dictionary *data, char *result){
+	/* Verifica que los parametros esten todos y que
+ 	 * tengan un formato correcto. En *result retorna
+ 	 * el error en formato json de ser necesario */
+	if(!valid_user_name(dictionary_get(data,"name"))){
+		strcpy(result,"{\"task\":\"\",\"stauts\":\"ERROR\",\"data\":\"Nombre usuario invalido\"}");
+		return 0;
+	}
+	if(!valid_pass(dictionary_get(data,"pass"))){
+		strcpy(result,"{\"task\":\"\",\"stauts\":\"ERROR\",\"data\":\"Password invalida\"}");
+		return 0;
+	}
+	if(!valid_email(dictionary_get(data,"email"))){
+		strcpy(result,"{\"task\":\"\",\"stauts\":\"ERROR\",\"data\":\"email invalido\"}");
+		return 0;
+	}
 	return 1;
 }
 
 int check_data_susc_add(T_dictionary *data, char *result){
-	/*Verificamos existensia de parametros */
-	if(dictionary_get(data,"plan_id") == NULL){
-		strcpy(result,"Falta parametro id del plan (plan_id)");
+	/* Verifica que los parametros esten todos y que
+ 	 * tengan un formato correcto. En *result retorna
+ 	 * el error en formato json de ser necesario */
+	if(!valid_id(dictionary_get(data,"plan_id"))){
+		strcpy(result,"{\"task\":\"\",\"stauts\":\"ERROR\",\"data\":\"plan_id invalido\"}");
 		return 0;
 	}
-	if(dictionary_get(data,"user_id") == NULL){
-		strcpy(result,"Falta parametro id del user (user_id)");
+	if(!valid_id(dictionary_get(data,"susc_id"))){
+		strcpy(result,"{\"task\":\"\",\"stauts\":\"ERROR\",\"data\":\"susc_id invalido\"}");
 		return 0;
 	}
 	return 1;
@@ -59,7 +135,7 @@ void rest_server_add_task(T_rest_server *r, T_task *j){
 	pthread_mutex_unlock(&(r->mutex_heap_task));
 }
 
-void rest_server_error(char *result, int *ok){
+void rest_server_url_error(char *result, int *ok){
 	strcpy(result,"{\'task\':\'\',\'stauts\':\'ERROR\',\'data\':\'api call invalid\'}");
 	*ok=0;
 }
@@ -128,7 +204,9 @@ void rest_server_get_task(T_rest_server *r, T_taskid *taskid, char **message, un
 	} else {
 		/* Armamos en message el resultado de la terea */
 		//task_print_status(task,status);
-		task_json_result(task,message,message_size);
+		printf("REST_SERVER_GET_TASK: json\n");
+		task_json_result(task,message);
+		printf("REST_SERVER_GET_TASK: json fin\n");
 		/* Destruimos el task si este ya a finalizado */
 		if(task_get_status(task) > T_WAITING)
 			task_destroy(&task);
@@ -169,7 +247,7 @@ static int handle_POST(struct MHD_Connection *connection,
 		if(strlen(value)>0){
 			ok=0;
 		
-			rest_server_error(result,&ok);
+			rest_server_url_error(result,&ok);
 		} else {
 			if(ok = check_data_plan_add(con_info->data,result))
 				task_init(task,&token,T_PLAN_ADD, con_info->data);
@@ -191,52 +269,43 @@ static int handle_POST(struct MHD_Connection *connection,
 							parce_data((char *)url,'/',&pos,value);
 							if(strlen(value)>0){
 								dictionary_add(con_info->data,"site_id",value);
+								/* EDICION SITIO */
 								if(ok = check_data_site_mod(con_info->data,result))
 									task_init(task,&token,T_SITE_MOD,con_info->data);
-								else
-									rest_server_error(result,&ok);
 							} else {
+								/* ALTA SITIO */
 								if(ok = check_data_site_add(con_info->data,result))
 									task_init(task,&token,T_SITE_ADD,con_info->data);
-								else
-									rest_server_error(result,&ok);
 							}
 						} else {
+							/* EDICION SUSCRIPCIONES */
 							dictionary_add(con_info->data,"susc_id",value);
 							if(ok = check_data_susc_mod(con_info->data,result))
 								task_init(task,&token,T_SUSC_MOD,con_info->data);
-							else
-								rest_server_error(result,&ok);
 						}
 					} else {
 						/* ALTA SUSCRIPCIONES */
 						if(ok = check_data_susc_add(con_info->data,result))
 							task_init(task,&token,T_SUSC_ADD,con_info->data);
-						else
-							rest_server_error(result,&ok);
 					}
 				} else {
-					rest_server_error(result,&ok);
+					rest_server_url_error(result,&ok);
 				}
 			} else {
 				/* EDICION DE USUARIO */
 				if(ok = check_data_user_mod(con_info->data,result))
 					task_init(task,&token,T_USER_MOD,con_info->data);
-				else
-					rest_server_error(result,&ok);
 			}
 		} else {
 			/* ALTA DE USUARIO */
 			if(ok = check_data_user_add(con_info->data,result))
 				task_init(task,&token,T_USER_ADD,con_info->data);
-			else
-				rest_server_error(result,&ok);
 		}
 	/* CUALQUIER OTRA COSA. ERROR */
 	} else {
 		strcpy(result,"URL mal ingresada");
 		ok=0;
-		rest_server_error(result,&ok);
+		rest_server_url_error(result,&ok);
 	}
 
 	if(ok){
@@ -275,7 +344,7 @@ static int handle_DELETE(struct MHD_Connection *connection, const char *url){
 			/* BORRAR PLAN */
 			task_init(task,&token,T_PLAN_DEL,data);
 		} else {
-			rest_server_error(result,&ok);
+			rest_server_url_error(result,&ok);
 		}
 	} else if(0 == strcmp("users",value)){
 		parce_data((char *)url,'/',&pos,value);
@@ -297,24 +366,24 @@ static int handle_DELETE(struct MHD_Connection *connection, const char *url){
 								dictionary_add(data,"site_id",value);
 								task_init(task,&token,T_SITE_DEL,data);
 							} else {
-								rest_server_error(result,&ok);
+								rest_server_url_error(result,&ok);
 							}
 						} else {
 							/* BORRADO SUSCRIPCION */
 							task_init(task,&token,T_SUSC_DEL,data);
 						}
 					} else {
-						rest_server_error(result,&ok);
+						rest_server_url_error(result,&ok);
 					}
 				} else {
-					rest_server_error(result,&ok);
+					rest_server_url_error(result,&ok);
 				}
 			} else {
 				/* BORRAR USUARIO */
 				task_init(task,&token,T_USER_DEL,data);
 			}
 		} else {
-			rest_server_error(result,&ok);
+			rest_server_url_error(result,&ok);
 		}
 	}
 
@@ -380,26 +449,33 @@ static int handle_GET(struct MHD_Connection *connection, const char *url){
 								if(strlen(value)>0){
 									/* Show site */
 									dictionary_add(data,"site_id",value);
-									task_init(task,&token,T_SITE_SHOW,data);
+									if(ok = check_site_show(data,result))
+										task_init(task,&token,T_SITE_SHOW,data);
 								} else {
 									/* Listado de sitios */
-									task_init(task,&token,T_SITE_LIST,data);
+									if(ok = check_site_list(data,result))
+										task_init(task,&token,T_SITE_LIST,data);
 								}
 							} else {
-								rest_server_error(result,&ok);
+								rest_server_url_error(result,&ok);
 							}
 						} else {
-							task_init(task,&token,T_SUSC_SHOW,data);
+							/* Informacion de una suscripcion */
+							if(ok = (check_susc_show(data,result)))
+								task_init(task,&token,T_SUSC_SHOW,data);
 						}
 					} else {
-						task_init(task,&token,T_SUSC_LIST,data);
+						/* Listado suscripciones de un usuario*/
+						if(ok = check_susc_list(data,result))
+							task_init(task,&token,T_SUSC_LIST,data);
 					}
 				} else {
-					rest_server_error(result,&ok);
+					rest_server_url_error(result,&ok);
 				}
 			} else {
 				/* Informacion sobre un usuario */
-				task_init(task,&token,T_USER_SHOW,data);
+				if(ok = check_user_show(data,result))
+					task_init(task,&token,T_USER_SHOW,data);
 			}
 		} else {
 			task_init(task,&token,T_USER_LIST,NULL);
@@ -413,13 +489,14 @@ static int handle_GET(struct MHD_Connection *connection, const char *url){
 		parce_data((char *)url,'/',&pos,value);
 		if(strlen(value)>0){
 			rest_server_get_task(&rest_server,(T_taskid *)value,&result,&size_result);
+			printf("handle_GET rest_server_get_task\n");
 		} else {
 			strcpy(result,"{task incorrecto}");
 		}
 
 	/* PARA CUALQUIER OTRA COSA */
 	} else {
-		rest_server_error(result,&ok);
+		rest_server_url_error(result,&ok);
 	}
 
 	if(ok){

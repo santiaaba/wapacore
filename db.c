@@ -4,20 +4,36 @@
  * 	T_DB
  ******************************/
 
-void db_init(T_db *db){
+/* La mayoria de las funciones son suseptibles a fallar si
+ se pierde conexion a la base de datos. Todas las funciones
+ retornan si fallaron a causa de conectividad con la base de datos
+ 
+ 0	=>	FALSO
+ 1	=>	VERDADERO
+ 2	=>	FALLA BASE DE DATOS
+
+ */
+
+void db_init(T_db *db, T_config *c){
 	db->con = mysql_init(NULL);
+	db->DB_ONLINE;
+	strcpy(db->user,c->db_user);
+	strcpy(db->pass,c->db_pass);
+	strcpy(db->host,c->db_server);
+	strcpy(db->dbname,c->db_name);
 }
 
-int db_connect(T_db *db, T_config *c){
-	if (!mysql_real_connect(db->con, c->db_server,
-		c->db_user, c->db_pass, c->db_name, 0, NULL, 0)) {
-		return 0;
-	}
-	return 1;
+int db_connect(T_db *db){
+	if (mysql_real_connect(db->con, db->host,
+	     db->user, db->pass, db->dbname, 0, NULL, 0)) {
+		db->DB_ONLINE;
+	} else
+		db_close(db);
 }
 
 void db_close(T_db *db){
 	mysql_close(db->con);
+	db->DB_OFFLINE;
 }
 
 const char *db_error(T_db *db){
@@ -25,6 +41,8 @@ const char *db_error(T_db *db){
 }
 
 int db_load_clouds(T_db *db, T_list_cloud *clouds){
+	/* Levanta las nubes de la base de datos
+ 	   retorna 0 si no pudo a causa de algun error */
 	MYSQL_ROW row;
 	T_cloud *new_cloud;
 
@@ -57,45 +75,69 @@ int db_get_cloud_id(T_db *db, int susc_id, T_cloud_type t, int *cloud_id){
 
 	mysql_query(db->con,sql);
 	result = mysql_store_result(db->con);
-	row = mysql_fetch_row(result);
-	if(row){
-		*cloud_id=atoi(row[0]);
-		return 1;
+	if(result){
+		row = mysql_fetch_row(result);
+		if(row){
+			*cloud_id=atoi(row[0]);
+			return 1;
+		} else {
+			return 0;
+		}
 	} else {
-		return 0;
+		return 2;
 	}
 }
 
 int db_susc_exist(T_db *db, T_dictionary *d, char *message){
-	/* Indica si una suscripcion existe */
+	/* Indica si una suscripcion existe. Retorna 1
+ 	   si la suscripcion es del usuario y 0 en caso contrario
+	   o falla de conectividad a la DB. En caso de retornar
+	   0 se debe verificar en la estructura T_db el estado de la
+	   conexión
+ 	*/
+		
 	char sql[100];
 	MYSQL_RES *result;
         MYSQL_ROW row;
 
 	sprintf(sql,"select count(id) from suscription where id=%s and user_id=%s",
 		dictionary_get(d,"susc_id"),dictionary_get(d,"user_id"));
+	mysql_query(db->con,sql);
 	result = mysql_store_result(db->con);
-	row = mysql_fetch_row(result);
-        if(atoi(row[0]) >  0){
-                strcpy(message,"'Suscripcion inexistente'");
-                return 0;
-        } else {
-		return 1;
+	if(result){
+		row = mysql_fetch_row(result);
+	        if(atoi(row[0]) >  0)
+        	        return 1;
+        	else 
+			return 0;
+	} else {
+		return 2;
 	}
 }
 
-void db_user_list(T_db *db, MYSQL_RES **result){
+int db_user_list(T_db *db, MYSQL_RES **result){
 
 	mysql_query(db->con,"select id,name from user");
 	*result = mysql_store_result(db->con);
+	if (*result){
+		return 1
+	} else {
+		return 2
+	}
 }
 
-void db_user_show(T_db *db, MYSQL_RES **result,char *id){
+int db_user_show(T_db *db, MYSQL_RES **result, char *id){
 	char sql[100];
 
-	sprintf(sql,"select id,name,email from user where id=%s",id);
+	sprintf(sql,"select id,name,email,status from user where id=%s",id);
+	printf("%s\n",sql);
 	mysql_query(db->con,sql);
 	*result = mysql_store_result(db->con);
+	if (*result){
+		return 1
+	} else {
+		return 2
+	}
 }
 
 void db_susc_show(T_db *db, char *susc_id, MYSQL_RES **result){
@@ -108,6 +150,11 @@ void db_susc_show(T_db *db, char *susc_id, MYSQL_RES **result){
 	strcat(sql,susc_id);
 	mysql_query(db->con,sql);
 	*result = mysql_store_result(db->con);
+	if (*result){
+		return 1
+	} else {
+		return 2
+	}
 }
 
 void db_susc_list(T_db *db, char *user_id, MYSQL_RES **result){
@@ -116,6 +163,11 @@ void db_susc_list(T_db *db, char *user_id, MYSQL_RES **result){
 	sprintf(sql,"select s.id, s.name, p.name as plan_name from suscription s inner join plan p on (s.plan_id = p.id) where user_id=%s",user_id);
 	mysql_query(db->con,sql);
 	*result = mysql_store_result(db->con);
+	if (*result){
+		return 1
+	} else {
+		return 2
+	}
 }
 
 int db_user_add(T_db *db, T_dictionary *d, char *message){
@@ -126,21 +178,31 @@ int db_user_add(T_db *db, T_dictionary *d, char *message){
 	
 	// Verificamos que el usuario no exista ya */
 	sprintf(sql,"select count(name) from user where name='%s'",dictionary_get(d,"name"));
+	printf("DB_user_add: %s\n",sql);
 	mysql_query(db->con,sql);
 	result = mysql_store_result(db->con);
+	if(!result){
+		strcpy(message,"{\"code\":\"300\",\"info\":\"ERROR FATAL\"}");
+		return 2;
+	}
 	row = mysql_fetch_row(result);
 	if(atoi(row[0]) >  0){
-		strcpy(message,"'Usuario ya existe'");
+		strcpy(message,"{\"code\":\"312\",\"info\":\"usuario existente\"}");
 		return 0;
 	}
 	sprintf(sql,"insert into user(name,pass,email) values ('%s','%s','%s')",
 		dictionary_get(d,"name"),dictionary_get(d,"pass"),dictionary_get(d,"email"));
+	printf("DB_user_add: %s\n",sql);
 	if(0 != mysql_query(db->con,sql)){
-		strcpy(message,"'Error FATAL'");
-		return 0;
+		strcpy(message,"{\"code\":\"300\",\"info\":\"ERROR FATAL\"}");
+		return 2;
 	}
+	strcpy(message,"{\"code\":\"221\",\"info\":\"usuario agregado\"}");
+	printf("%s\n",message);
 	return 1;
 }
+
+HASTA ACA. ARREGLAMOS el esquema de que retorne 2 si falla base de datos
 
 int db_user_del(T_db *db, T_dictionary *d, char *message){
 
@@ -220,6 +282,7 @@ int db_user_mod(T_db *db, T_dictionary *d, char *message){
 	}
 
 	sprintf(sql,"update user %s where id=%s",sql_aux,dictionary_get(d,"user_id"));
+	printf("DB_USER_MOD: %s\n",sql);
 	if(0 != mysql_query(db->con,sql)){
 		strcpy(message,"'Error FATAL'");
 		return 0;
@@ -292,7 +355,7 @@ int db_susc_add(T_db *db, T_dictionary *d, char *message){
 	}
 
 	sprintf(susc_id_char,"%lu",susc_id);
-	directory_add(d,"susc_id",susc_id_char);
+	dictionary_add(d,"susc_id",susc_id_char);
 
 	return 1;
 }
@@ -369,4 +432,8 @@ int db_susc_del(T_db *db, T_dictionary *d, char *message){
 		strcpy(message,"'Error FATAL'");
 		return 0;
 	}
+}
+
+int db_accept_add_site(T_db *db, char *susc_id){
+	return 1;
 }

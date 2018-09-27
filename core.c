@@ -36,10 +36,12 @@ void main(){
 	//Levantamos la configuracion 
 	if(!config_load("core.conf",&config))
 		exit(1);
+	printf("Conectamos base de datos\n");
 	// Conectamos contra la base de datos
-	db_init(&db);
+	db_init(&db,&config);
 
-	if (!db_connect(&db,&config)){
+	if (!db_connect(&db)){
+		printf("Imposible conectar a la base de datos\n");
 		exit(1);
 	}
 
@@ -53,8 +55,8 @@ void main(){
 	rest_server_init(&rest_server,&db,&clouds);
 
 	while(1){
-		/* Revisamos estado de las nubes */
-		check_clouds(&clouds);
+		//check_clouds(&clouds);
+		//check db_connection
 		sleep(5);
 	}
 }

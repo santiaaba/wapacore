@@ -33,7 +33,7 @@ void task_init(T_task *t, T_tasktoken *token, T_task_type type, T_dictionary *da
 	t->step=0;
 	t->status = T_TODO;
 	t->result = (char *)malloc(TASKRESULT_SIZE);
-	t->result_size = TASKRESULT_SIZE;
+	//t->result_size = TASKRESULT_SIZE;
 	t->cloud = NULL;
 	strcpy(t->result,"");
 }
@@ -46,8 +46,11 @@ void task_destroy(T_task **t){
 	if((*t)->data != NULL){
 		dictionary_destroy(&((*t)->data));
 	}
+	//printf("TASK_DESTROY-dic\n");
 	free((*t)->result);
+	//printf("TASK_DESTROY-result\n");
 	free(*t);
+	//printf("TASK_DESTROY-fin\n");
 }
 
 T_task_status task_get_status(T_task *t){
@@ -67,59 +70,82 @@ void task_print_status(T_task *t, char *s){
 	}
 }
 
-void task_set_result(T_task *t, char *message){
-	t->result_size = strlen(message);
-	t->result=(char *)realloc(t->result,t->result_size);
+void task_set_result(T_task *t, T_task_status status, char *message){
+	//printf("TASK_SET_RESULT\n");
+	//printf("%s\n",message);
+	t->status = status;
+	//t->result_size = strlen(message);
+	t->result=(char *)realloc(t->result,strlen(message)+1);
 	strcpy(t->result,message);
+	//printf("TASK_SET_RESULT-fin\n");
 }
 
 char *tob_get_id(T_task *t){
 	return t->id;
 }
 
-int task_user_list(T_task *t, T_db *db){
+void task_user_list(T_task *t, T_db *db){
 	MYSQL_RES *result;
+	char *message=NULL;
+	char *aux=NULL;
 
-	db_user_list(db,&result);
-	json_user_list(&(t->result),&(t->result_size),result);
-	t->status = T_DONE_OK;
+	if(!db_user_list(db,&result)){
+		task_set_result(t,T_DONE_ERROR,"{\"code\":\"300\",\"info\":\"ERROR FATAL\"}");
+	} else {
+		json_user_list(&aux,result);
+		message=(char *)malloc(strlen(aux)+ 25);
+		sprintf(message,"{\"code\":\"200\",\"info\":%s",aux);
+		task_set_result(t,T_DONE_OK,message);
+	}
+	free(message);
+	free(aux);
 }
 
-int task_user_show(T_task *t, T_db *db){
+void task_user_show(T_task *t, T_db *db){
 	MYSQL_RES *result;
+	char *aux=NULL;
+	char *message=NULL;
 	char *id;
 
-	id = dictionary_get(t->data,"userid");
-	db_user_show(db,&result,id);
-	if(json_user_show(&(t->result),&(t->result_size),result)){
-		t->status = T_DONE_OK;
+	printf("TASK_USER_SHOW\n");
+	id = dictionary_get(t->data,"user_id");
+	if(!db_user_show(db,&result,id)){
+		task_set_result(t,T_DONE_ERROR,"{\"code\":\"300\",\"info\":\"ERROR FATAL\"}");
 	} else {
-		t->status = T_DONE_ERROR;
+		if(!json_user_show(&aux,result)){
+			task_set_result(t,T_DONE_ERROR,"{\"code\":\"320\",\"info\":\"Usuario inexistente\"}");
+		}
 	}
+	message=(char *)malloc(strlen(aux)+ 25);
+	sprintf(message,"{\"code\":\"200\",\"info\":%s",aux);
+	task_set_result(t,T_DONE_OK,message);
+	free(message);
+	free(aux);
 }
 
-int task_user_add(T_task *t, T_db *db){
-	char result[100];
+void task_user_add(T_task *t, T_db *db){
+	char result[200];
 
 	if(db_user_add(db,t->data,result)){
-		strcpy(t->result,"usuario agregado correctamente");
-		t->status = T_DONE_OK;
+		task_set_result(t,T_DONE_OK,result);
 	} else {
-		strcpy(t->result,result);
-		t->status = T_DONE_ERROR;
+		task_set_result(t,T_DONE_ERROR,result);
 	}
 }
+
 
 int task_user_mod(T_task *t, T_db *db){
 	char result[100];
+
+	printf("TASK_USER_MOD\n");
 	if(db_user_mod(db,t->data,result)){
-		strcpy(t->result,"usuario modificado");
-		t->status = T_DONE_OK;
+		 task_set_result(t,T_DONE_OK,result);
 	} else {
-		strcpy(t->result,result);
-		t->status = T_DONE_ERROR;
+		task_set_result(t,T_DONE_ERROR,result);
 	}
 }
+
+/*-------------------------- ACA QUEDAMOS ---------------*/
 
 int task_susc_add(T_task *t, T_db *db, T_list_cloud *cl){
 	/* Agrega una suscripcion. Se conecta a las
@@ -264,7 +290,7 @@ int task_susc_show(T_task *t, T_db *db){
 
 	/* Recolectamos los datos de la suscripcion global */
 	db_susc_show(db,susc_id,&result);
-	if(!json_susc_show(&(t->result),&(t->result_size),result)){	
+	if(!json_susc_show(&(t->result),result)){	
 		t->status = T_DONE_ERROR;
 		return 0;
 	}
@@ -277,17 +303,16 @@ int task_susc_list(T_task *t, T_db *db){
 	char *user_id = dictionary_get(t->data,"user_id");
 
 	db_susc_list(db,user_id,&result);
-	json_susc_list(&(t->result),&(t->result_size),result);
+	json_susc_list(&(t->result),result);
 	t->status = T_DONE_OK;
 }
 
-void task_json_result(T_task *t, char **result, int *result_size){
+void task_json_result(T_task *t, char **result){
 
 	char aux[20];
 
 	task_print_status(t, aux);
-	*result=(char *)realloc(*result,(t->result_size) + 200);
-	*result_size = t->result_size + 200;
+	*result=(char *)realloc(*result,strlen(t->result) + 200);
 	sprintf(*result,"{\"taskid\":\"%s\",\"status\":\"%s\",\"data\":%s}",t->id,aux,t->result);
 }
 
@@ -334,7 +359,7 @@ int task_cloud_get(T_task *t){
 
 			t->result=(char *)realloc(t->result,rcv_message_size - pos);
 			memcpy(t->result,&rcv_message[pos],rcv_message_size - pos);
-			t->result_size = rcv_message_size - pos;
+			//t->result_size = rcv_message_size - pos;
 			t->status = T_DONE_OK;
 		} else {
 			/* task no existe en la nube */
@@ -357,34 +382,45 @@ int task_site_list(T_task *t){
 	}
 }
 
-int task_site_show(T_task *t){
+int task_site_show(T_task *t, T_db *db){
 	/* Solicita al Controller los datos de un sitio.
  	 El Controller ya lo retorna en formato json */
 	char send_message[100];
 
-	if(t->status == T_TODO){
-		sprintf(send_message,"ssite_id|%s",dictionary_get(t->data,"site_id"));
-		task_cloud_send(t,send_message);
-	} else if(t->status == T_WAITING){
-		task_cloud_get(t);
+	/* Verificamos que el susc_id sea del cliente user_id */
+
+	if(db_user_susc(db,dictionary_get(t->data,"user_id"),
+			dictionary_get(t->data,"susc_id"))){
+		if(t->status == T_TODO){
+			sprintf(send_message,"ssite_id|%s|susc_id|%s",
+				dictionary_get(t->data,"site_id"),
+				dictionary_get(t->data,"susc_id"));
+			task_cloud_send(t,send_message);
+		} else if(t->status == T_WAITING){
+			task_cloud_get(t);
+		}
+	} else {
 	}
 }
 
-int task_site_add(T_task *t){
+int task_site_add(T_task *t, T_db *db){
 	/* Solicita a la nube web agregar un sitio nuevo.
  	 * la nube ya retorna en formato json el resultado */
 	char send_message[100];
+	char *susc_id;
 
 	if(t->status == T_TODO){
-		/* Realizamos verificaciones sobre el plan */
+		/* Realizamos cantidad de sitios permitidos*/
+		susc_id = dictionary_get(t->data,"susc_id");
+		if(!db_accept_add_site(db,susc_id)){
+			task_set_result(t,T_DONE_ERROR,"{\"code\":\"303\",\"info\":\"ERROR FATAL\"}");
+		} else {
+			/* Enviamos la accion a la nube */
+			sprintf(send_message,"aname|%s|susc_id|%s",
+				susc_id,dictionary_get(t->data,"susc_id"));
+			task_cloud_send(t,send_message);
+		}
 
-		/* Enviamos la accion a la nube */
-		sprintf(send_message,"aname|%s|susc_id|%s",
-			dictionary_get(t->data,"name"),
-			dictionary_get(t->data,"susc_id")
-		);
-
-		task_cloud_send(t,send_message);
 	} else if(t->status == T_WAITING){
 		task_cloud_get(t);
 	}
@@ -450,8 +486,8 @@ void task_run(T_task *t, T_db *db, T_list_cloud *cl){
 		switch(t->type){
 			/* SITES */
 			case T_SITE_LIST: task_site_list(t); break;
-			case T_SITE_SHOW: task_site_show(t); break;
-			case T_SITE_ADD: task_site_add(t); break;
+			case T_SITE_SHOW: task_site_show(t,db); break;
+			case T_SITE_ADD: task_site_add(t,db); break;
 			case T_SITE_MOD: task_site_mod(t); break;
 			case T_SITE_DEL: task_site_del(t); break;
 		}

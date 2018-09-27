@@ -5,6 +5,7 @@
 #include "json.h"
 #include "dictionary.h"
 #include "task.h"
+#include "valid.h"
 
 #ifndef REST_SERVER_H
 #define REST_SERVER_H

@@ -80,18 +80,18 @@ typedef struct {
 	//T_cloud_type cloud_type;	//tipo de nube
 	int result_code;		//codigo obtenido de la nube
 	char *result;			//resultado en formato json para retornar.
-	unsigned int result_size;	//datos para realizar la accion
+	//unsigned int result_size;	//datos para realizar la accion
 } T_task;
 
 void task_init(T_task *t, T_tasktoken *token, T_task_type type, T_dictionary *data);
 void task_destroy(T_task **t);
 void task_run(T_task *t, T_db *db, T_list_cloud *cl);
 T_tasktoken *task_get_token(T_task *t);
-void task_set_result(T_task *t, char *message);
+void task_set_result(T_task *t, T_task_status status, char *message);
 void task_print_status(T_task *t, char *s);
 char *task_get_id(T_task *t);
 T_task_status task_get_status(T_task *t);
-void task_json_result(T_task *t, char **result, int *result_size);
+void task_json_result(T_task *t, char **result);
 
 /*****************************
          Cola de tareas
