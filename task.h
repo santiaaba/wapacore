@@ -14,6 +14,9 @@
 #define TOKEN_SIZE		25
 #define TASKID_SIZE		25
 #define TASKRESULT_SIZE		200
+#define ERROR_FATAL		"{\"code\":\"300\",\"info\":\"ERROR FATAL\"}"
+#define ERROR_TASK_CLOUD	"{\"code\":\"300\",\"info\":\"TASK inexistente en la nube\"}"
+#define ERROR_CLOUD		"{\"code\":\"300\",\"info\":\"Nube inaccesible\"}"
 
 typedef enum {	
 	/* PLAN */
@@ -49,8 +52,7 @@ typedef enum {
 typedef enum {
 		T_TODO,
 		T_WAITING,
-		T_DONE_OK,
-		T_DONE_ERROR
+		T_DONE
 } T_task_status;
 
 typedef enum {
@@ -68,6 +70,15 @@ typedef char T_tasktoken[TOKEN_SIZE];
 /*****************************
 		TASK	
 ******************************/
+/* Los task representan acciones a realizar. las TASK al crearse se crean todos
+ * en estado T_TODO y con un tipo que identifica la acción a realizar. La funcion
+ * task_run toma el task, identifica su tipo e invoca a la función que realiza
+ * la acción. La función que realiza la acción es la que cambia el estado del
+ * task a T_WAITING si se debe esperar o a T_DONE si el task ya se ha cumplido
+ * En el paráemtro result queda registrado en formato JSON el resultado del task
+ * incluyendo cómo termino el mismo.
+ */
+
 typedef struct {
         T_taskid id;
         T_tasktoken *token;
@@ -77,17 +88,15 @@ typedef struct {
 	T_dictionary *data;		//datos necesarios para realizar la accion
 	T_cloud *cloud;			//Cuando interviene una nube... queda asignada
 	int step;			// Para acciones que involucran mas de un paso... indica el paso
-	//T_cloud_type cloud_type;	//tipo de nube
-	int result_code;		//codigo obtenido de la nube
+	int result_code;		//codigo obtenido de la nube. Se inicializa en 0.
 	char *result;			//resultado en formato json para retornar.
-	//unsigned int result_size;	//datos para realizar la accion
 } T_task;
 
 void task_init(T_task *t, T_tasktoken *token, T_task_type type, T_dictionary *data);
 void task_destroy(T_task **t);
 void task_run(T_task *t, T_db *db, T_list_cloud *cl);
 T_tasktoken *task_get_token(T_task *t);
-void task_set_result(T_task *t, T_task_status status, char *message);
+void task_done(T_task *t, char *message);
 void task_print_status(T_task *t, char *s);
 char *task_get_id(T_task *t);
 T_task_status task_get_status(T_task *t);

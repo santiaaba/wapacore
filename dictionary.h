@@ -23,6 +23,7 @@ struct dictionary{
 
 void dictionary_init(T_dictionary *d);
 int dictionary_add(T_dictionary *d, char *key, char *value);
+void dictionary_remove(T_dictionary *d, char *key);
 char *dictionary_get(T_dictionary *d, char *key);
 void dictionary_destroy(T_dictionary **d);
 void dictionary_clean(T_dictionary *d);

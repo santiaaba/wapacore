@@ -6,13 +6,20 @@ int valid_domain(char *s){
 	int i=0;
 	int ok=1;
 
-	if(s == NULL)
+	printf("Validando %s\n",s);
+	if(s == NULL){
+		printf("Invalido s null\n");
 		return 0;
+	}
 	size =strlen(s);
-	if(size < DOMAIN_MIN_LEN || size > DOMAIN_MAX_LEN)
+	if(size < DOMAIN_MIN_LEN || size > DOMAIN_MAX_LEN){
+		printf("Invalido exede\n");
 		return 0;
-	if(s[i] != '.')
+	}
+	if(s[i] == '.'){
+		printf("Invalido. Es '.'\n");
 		return 0;
+	}
 
 	while(ok && i<size){
 		if(s[i] == '.'){
@@ -119,6 +126,7 @@ int valid_id(char *s){
 	i=1;
 	while(ok && i<size){
 		ok = ((47 < (int)s[i] && (int)s[i] < 58));
+		i++;
 	}
 	return ok;
 

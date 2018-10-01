@@ -7,7 +7,7 @@ void dictionary_init(T_dictionary *d){
 }
 int dictionary_add(T_dictionary *d, char *key, char *value){
 	dictionary_node *new;
-        dictionary_node *aux;
+	dictionary_node *aux;
 	int exist=0;
 
 	aux = d->first;
@@ -16,7 +16,7 @@ int dictionary_add(T_dictionary *d, char *key, char *value){
 		aux=aux->next;
 	}
 	if(!exist){
-	        new = (dictionary_node*)malloc(sizeof(dictionary_node));
+		new = (dictionary_node*)malloc(sizeof(dictionary_node));
 		new->key = (char *)malloc(strlen(key)+1);
 		new->value = (char *)malloc(strlen(value)+1);
 		strcpy(new->key,key);
@@ -35,6 +35,30 @@ int dictionary_add(T_dictionary *d, char *key, char *value){
 	} else {
 		return 0;
 	}
+}
+void dictionary_remove(T_dictionary *d, char *key){
+	dictionary_node *prio;
+	dictionary_node *aux;
+	int exist=0;
+
+	aux = d->first;
+	while(!exist && aux != NULL){
+		if(strcmp(aux->key,key) == 0) exist=1;
+		prio = aux;
+		aux=aux->next;
+	}
+	if(prio == NULL){
+		d->first = aux->next;
+	} else {
+		prio->next = aux->next;
+	}
+	if(aux == d->last){
+		d->last = prio;
+	}
+	free(aux->key);
+	free(aux->value);
+	free(aux);
+	d->size--;
 }
 char *dictionary_get(T_dictionary *d, char *key){
 	dictionary_node *aux;

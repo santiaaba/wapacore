@@ -17,14 +17,6 @@ int check_susc_show(T_dictionary *data, char *result){
                 strcpy(result,"{\"task\":\"\",\"stauts\":\"ERROR\",\"data\":\"Id suscripcion invalido\"}");
                 return 0;
         }
-	return 1;
-}
-
-int check_susc_list(T_dictionary *data, char *result){
-	if(!valid_id(dictionary_get(data,"susc_id"))){
-                strcpy(result,"{\"task\":\"\",\"stauts\":\"ERROR\",\"data\":\"Id suscripcion invalido\"}");
-                return 0;
-        }
 	if(!valid_id(dictionary_get(data,"user_id"))){
                 strcpy(result,"{\"task\":\"\",\"stauts\":\"ERROR\",\"data\":\"Id usuario invalido\"}");
                 return 0;
@@ -151,7 +143,7 @@ void *rest_server_do_task(void *param){
 		pthread_mutex_unlock(&(r->mutex_heap_task));
 		if(task != NULL){
 			task_run(task,r->db,r->clouds);
-			if(task_get_status(task)>1){
+			if(task_get_status(task) == T_DONE){
 				pthread_mutex_lock(&(r->mutex_bag_task));
 					bag_task_add(&(r->tasks_done),task);
 					bag_task_print(&(r->tasks_done));
@@ -466,8 +458,7 @@ static int handle_GET(struct MHD_Connection *connection, const char *url){
 						}
 					} else {
 						/* Listado suscripciones de un usuario*/
-						if(ok = check_susc_list(data,result))
-							task_init(task,&token,T_SUSC_LIST,data);
+						task_init(task,&token,T_SUSC_LIST,data);
 					}
 				} else {
 					rest_server_url_error(result,&ok);

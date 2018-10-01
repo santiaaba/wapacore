@@ -6,7 +6,7 @@ int json_user_list(char **data, MYSQL_RES *result){
 	int size=100;
 	
 	*data = (char *) realloc(*data,size);
-	strcpy(*data,"[");
+	strcpy(*data,"{\"code\":\"200\",\"info\":[");
 	while ((row = mysql_fetch_row(result))){
 		if((strlen(*data)) + strlen(row[0]) + 5 > size){
 			size = size + 100;
@@ -49,11 +49,14 @@ int json_task(char *status, char *id, char *result, char **message){
 }
 
 int json_susc_list(char **data, MYSQL_RES *result){
+	/* Retorna en formato json el resultado de result */
 
 	MYSQL_ROW row;
 	int size=0;
 	
-	strcpy(*data,"[");
+	size = size + 100;
+	*data = (char *) realloc(*data,size);
+	strcpy(*data,"{\"code\":\"200\",\"info\":[");
 	printf("Al menos aca %p\n",result);
 	while ((row = mysql_fetch_row(result))){
 		printf("ROW: %p\n",row);
@@ -67,33 +70,27 @@ int json_susc_list(char **data, MYSQL_RES *result){
 	(*data)[strlen(*data)-1] = ']';
 }
 
-int json_susc_show(char **data, MYSQL_RES *result){
-	/* Retorna todos los datos de una suscripcion.
-	 * incluyendo los datos de las nubes */
+int json_susc_show(char **message, MYSQL_RES *result){
+	/* Toma los datos de *result y los retorna en **messaje
+ 	   en formato json */
 
 	MYSQL_ROW row;
 	char aux[1000];
 	int size=0;
 
 	row = mysql_fetch_row(result);
-	if(row==NULL){
-		sprintf(aux,"{}");
-		return 0;
-	} else {
-		sprintf(aux,"{\"suscid\":\"%s\",\"plan name\":\"%s\",\"name\":\"%s\",\"status\":\"%s\", \"services\": [",row[0],row[1],row[2],row[3]);
-		size = strlen(aux) + 1;
-		*data = (char *) realloc(*data,size);
-		strcpy(*data,aux);
+	sprintf(aux,"{\"code\":\"200\",\"info\":{\"suscid\":\"%s\",\"plan name\":\"%s\",\"name\":\"%s\",\"status\":\"%s\", \"services\": [",row[0],row[1],row[2],row[3]);
+	size = strlen(aux) + 1;
+	*message = (char *) realloc(*message,size);
+	strcpy(*message,aux);
 
-		/* Nube de hosting. Son los 1 datos a partir del row[4] inclusive */
-		if(row[5] != NULL){
-			sprintf(aux,"{\"name\":\"web_hosting\",\"hash_dir\":\"%s\",\"quota\":\"%s\",\"sites\":\"%s\"}",
-			row[4],row[5],row[6]);
-			size = strlen(aux) + strlen(*data) + 4;
-			*data = (char *) realloc(*data,size);
-			strcat(*data,aux);
-		}
-		strcat(*data,"]}");
-		return 1;
+	/* Nube de hosting. Son los 1 datos a partir del row[4] inclusive */
+	if(row[5] != NULL){
+		sprintf(aux,"{\"name\":\"web_hosting\",\"hash_dir\":\"%s\",\"quota\":\"%s\",\"sites\":\"%s\"}",
+		row[4],row[5],row[6]);
+		size = strlen(aux) + strlen(*message) + 4;
+		*message = (char *) realloc(*message,size);
+		strcat(*message,aux);
 	}
+	strcat(*message,"]}");
 }
