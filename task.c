@@ -77,6 +77,311 @@ char *tob_get_id(T_task *t){
 	return t->id;
 }
 
+/*************	TASK SUSCRIPT  ***********************/
+
+int task_susc_add(T_task *t, T_db *db, T_list_cloud *cl){
+	/* Agrega una suscripcion. Se conecta a las
+ 	 * nubes que correspondan para dar de alta
+ 	 * los elementos de la suscripcion */
+
+	int ok;
+	char result[100];
+	char *susc_id;
+	int cloud_id;
+	char send_message[100];
+	T_cloud *c = NULL;
+	int db_fail;
+
+	/* Damos de alta la suscripcion en la base de datos del Core
+ 	   si corresponde */
+	if(t->status == T_TODO){
+		if(t->step == 0){
+			/* Realizamos chequeos previos */
+		} else if(t->step > 0 && t->step < 4){
+			/* Accionamos sobre las nubes */
+			susc_id = dictionary_get(t->data,"susc_id");
+			switch (t->step){
+				case 1:	ok = db_get_cloud_id(db,atoi(susc_id),C_WEB,&cloud_id,&db_fail);
+					break;
+				case 2: ok = db_get_cloud_id(db,atoi(susc_id),C_MYSQLDB,&cloud_id,&db_fail);
+					break;
+				case 3: ok = db_get_cloud_id(db,atoi(susc_id),C_MSSQLDB,&cloud_id,&db_fail);
+					break;
+			}
+			if(ok){
+				c = list_cloud_find_id(cl,cloud_id);
+				t->cloud = c;
+				sprintf(send_message,"0susc_id|%s", susc_id);
+				task_cloud_send(t,send_message);
+			} else {
+				if(db_fail)
+					task_done(t,ERROR_FATAL);
+			}
+		} else if(t->step == 4){
+			/* Accionamos sobre el CORE */
+			if(!db_susc_add(db,t->data,result,&db_fail))
+				task_done(t,ERROR_FATAL);
+			else
+				task_done(t,"{\"code\":\"211\",\"info\":\"Suscripcion agregada\"}");
+
+		}
+		t->step ++;	// dejo preparado para ejecutar el paso siguiente
+	} else if(t->status == T_WAITING){
+		task_cloud_get(t);
+		if(t->status == T_DONE){
+			if(t->result_code == 200){
+				/* La llamada a la nube retorno que genero el alta
+ 				 * pasamos al paso siguiente. */
+				t->status = T_TODO;
+			}
+		}
+	}
+}
+
+int task_susc_del(T_task *t, T_db *db, T_list_cloud *cl){
+	int ok;
+	char result[100];
+	char error[200];
+	char *susc_id;
+	int cloud_id;
+	char send_message[100];
+	T_cloud *c = NULL;
+	int db_fail;
+
+	/* Verificamos que ese suscripción exista para el
+ 	 * usuario indicado */
+
+	susc_id = dictionary_get(t->data,"susc_id");
+	if(t->status == T_TODO){
+		if(t->step == 0){
+			/* Realizamos chequeos previos */
+			if(!db_susc_exist(db,t->data,error,&db_fail)){
+				if(db_fail)
+					task_done(t,ERROR_FATAL);
+				else
+					task_done(t,error);
+			}
+		} else if(t->step > 0 && t->step < 4){
+			susc_id = dictionary_get(t->data,"susc_id");
+			switch (t->step){
+				case 1: ok = db_get_cloud_id(db,atoi(susc_id),C_WEB,&cloud_id,&db_fail);
+					break;
+				case 2: ok = db_get_cloud_id(db,atoi(susc_id),C_MYSQLDB,&cloud_id,&db_fail);
+					break;
+				case 3: ok = db_get_cloud_id(db,atoi(susc_id),C_MSSQLDB,&cloud_id,&db_fail);
+					break;
+			}
+			if(ok){
+				c = list_cloud_find_id(cl,cloud_id);
+				t->cloud = c;
+				sprintf(send_message,"1susc_id|%s", susc_id);
+				task_cloud_send(t,send_message);
+			} else {
+				if(db_fail)
+					task_done(t,ERROR_FATAL);
+			}
+		} else if(t->step == 4){
+			/* Accionamos sobre el CORE */
+			if(!db_susc_del(db,t->data,result,&db_fail))
+				task_done(t,result);
+			else
+				task_done(t,"{\"code\":\"212\",\"info\":\"Suscripcion eliminada\"}");
+		}
+		t->step ++;	// dejo preparado para ejecutar el paso siguiente
+	} else if(t->status == T_WAITING){
+		task_cloud_get(t);	//Esto me coloca el estado en T_DONE
+		if(t->status == T_DONE){
+			if(t->result_code == 200){
+				t->status = T_TODO;
+			}
+		}
+	}
+}
+
+int task_susc_mod(T_task *t, T_db *db){
+	/* Modifica los valores de una suscripcion */
+	char result[100];
+	char error[200];
+	int db_fail;
+
+	if(!db_susc_exist(db,t->data,error,&db_fail)){
+		if(db_fail)
+			task_done(t,ERROR_FATAL);
+		else
+			task_done(t,"{\"code\":\"310\",\"info\":\"Suscripcion inexistente\"}");
+	} else {
+		if(db_susc_mod(db,t->data,result,&db_fail)){
+			task_done(t,"{\"code\":\"213\",\"info\":\"Suscripcion modificada\"}");
+		} else {
+			if(db_fail)
+				task_done(t,ERROR_FATAL);
+			else {
+				task_done(t,result);
+			}
+		}
+	}
+}
+
+void task_susc_show(T_task *t, T_db *db){
+	MYSQL_RES *result;
+	char error[200];
+	char *aux=NULL;
+	int db_fail;
+
+	/* Recolectamos los datos de la suscripcion global */
+	if(!db_susc_show(db,t->data,&result,error,&db_fail)){
+		if(db_fail)
+			task_done(t,ERROR_FATAL);
+		else {
+			task_done(t,error);
+		}
+	} else {
+		json_susc_show(&aux,result);
+		task_done(t,aux);
+	}
+	free(aux);
+}
+
+void task_susc_list(T_task *t, T_db *db){
+	MYSQL_RES *result;
+	char error[200];
+	char *aux=NULL;
+	int db_fail;
+
+	printf("TASK_SUSC_LIST\n");
+	if(!db_susc_list(db,t->data,&result,error,&db_fail)){
+		if(db_fail)
+			task_done(t,ERROR_FATAL);
+		else
+			task_done(t,error);
+	} else {
+		json_susc_list(&aux,result);
+		task_done(t,aux);
+	}
+	free(aux);
+}
+
+void task_susc_stop(T_task *t, T_db *db, T_list_cloud *cl){
+	/* Le indicamos a las distintas nubes que forman parte
+ 	   de la suscripcion que detengan todos los elementos
+	   de la suscripcion */
+	int ok;
+	char *susc_id;
+	char result[100];
+	char error[200];
+	int db_fail;
+	int cloud_id;
+	T_cloud *c = NULL;
+	char send_message[100];
+
+	if(t->status == T_TODO){
+		if(t->step == 0){
+			/* Realizamos chequeos previos */
+			if(!db_susc_exist(db,t->data,error,&db_fail)){
+				if(db_fail)
+					task_done(t,ERROR_FATAL);
+				else
+					task_done(t,error);
+			}
+		} else 	if(t->step > 0 && t->step < 4){
+			/* Accionamos sobre las nubes */
+			susc_id = dictionary_get(t->data,"susc_id");
+			switch (t->step){
+				case 1: ok = db_get_cloud_id(db,atoi(susc_id),C_WEB,&cloud_id,&db_fail);
+					break;
+				case 2: ok = db_get_cloud_id(db,atoi(susc_id),C_MYSQLDB,&cloud_id,&db_fail);
+					break;
+				case 3: ok = db_get_cloud_id(db,atoi(susc_id),C_MSSQLDB,&cloud_id,&db_fail);
+					break;
+			}
+			if(ok){
+				c = list_cloud_find_id(cl,cloud_id);
+				t->cloud = c;
+				sprintf(send_message,"2susc_id|%s", susc_id);
+				task_cloud_send(t,send_message);
+			} else {
+				if(db_fail)
+					task_done(t,ERROR_FATAL);
+			}
+		} else if(t->step == 4){
+			/* Accionamos sobre el CORE */
+			if(!db_susc_stop(db,t->data,result,&db_fail))
+				task_done(t,ERROR_FATAL);
+			else
+				task_done(t,"{\"code\":\"214\",\"info\":\"Suscripcion detenida\"}");
+		}
+		t->step++;	
+	} else if(t->status == T_WAITING){
+		task_cloud_get(t);
+		if(t->status == T_DONE){
+			if(t->result_code == 200){
+				/* Pasamos al siguiente paso */
+				t->status = T_TODO;
+			}
+		}
+	}
+}
+
+void task_susc_start(T_task *t, T_db *db,T_list_cloud *cl){
+	/* Le indicamos a las distintas nubes que forman parte
+ 	   de la suscripcion que inicien todos los elementos
+	   de la suscripcion */
+	int ok;
+	char *susc_id;
+	char error[200];
+	int db_fail;
+	int cloud_id;
+	T_cloud *c = NULL;
+	char send_message[100];
+
+	if(t->status == T_TODO){
+		if(t->step == 0){
+			/* Realizamos chequeos previos */
+			if(!db_susc_exist(db,t->data,error,&db_fail)){
+				if(db_fail)
+					task_done(t,ERROR_FATAL);
+				else
+					task_done(t,error);
+			}
+		} else if(t->step > 0 && t->step < 4){
+			/* Accionamos sobre las nubes */
+			susc_id = dictionary_get(t->data,"susc_id");
+			switch (t->step){
+				case 1: ok = db_get_cloud_id(db,atoi(susc_id),C_WEB,&cloud_id,&db_fail);
+					break;
+				case 2: ok = db_get_cloud_id(db,atoi(susc_id),C_MYSQLDB,&cloud_id,&db_fail);
+					break;
+				case 3: ok = db_get_cloud_id(db,atoi(susc_id),C_MSSQLDB,&cloud_id,&db_fail);
+					break;
+			}
+			if(ok){
+				c = list_cloud_find_id(cl,cloud_id);
+				t->cloud = c;
+				sprintf(send_message,"3susc_id|%s", susc_id);
+				task_cloud_send(t,send_message);
+			} else {
+				if(db_fail)
+					task_done(t,ERROR_FATAL);
+			}
+		} else if(t->step == 4){
+			/* Accionamos sobre el CORE */
+			if(!db_susc_start(db,t->data,error,&db_fail))
+				task_done(t,ERROR_FATAL);
+			else
+				task_done(t,"{\"code\":\"215\",\"info\":\"Suscripcion iniciada\"}");
+		}
+		t->step++;	
+	} else if(t->status == T_WAITING){
+		task_cloud_get(t);
+		if(t->status == T_DONE){
+			if(t->result_code == 200){
+				/* Pasamos al siguiente paso */
+				t->status = T_TODO;
+			}
+		}
+	}
+}
+
 /*************	TASK USER  ***********************/
 
 void task_user_list(T_task *t, T_db *db){
@@ -183,196 +488,89 @@ int task_user_del(T_task *t, T_db *db, T_list_cloud *cl){
 		if(t->status == T_DONE){
 			dictionary_remove(t->data,"susc_id");
 			t->status == T_TODO;
+			t->step=0;
 		}
 	}
 }
 
-/*************	TASK SUSCRIPT  ***********************/
-
-int task_susc_add(T_task *t, T_db *db, T_list_cloud *cl){
-	/* Agrega una suscripcion. Se conecta a las
- 	 * nubes que correspondan para dar de alta
- 	 * los elementos de la suscripcion */
-
-	char result[100];
-	char *susc_id;
-	int cloud_id;
-	char send_message[100];
-	T_cloud *c = NULL;
+void task_user_stop(T_task *t, T_db *db, T_list_cloud *cl){
 	int db_fail;
-
-	/* Damos de alta la suscripcion en la base de datos del Core
- 	   si corresponde */
-	if(t->status == T_TODO){
-		switch (t->step){
-			case 0:	// Creamos la suscripcion en la nube web
-				susc_id = dictionary_get(t->data,"susc_id");
-				if(db_get_cloud_id(db,atoi(susc_id),C_WEB,&cloud_id,&db_fail)){
-					c = list_cloud_find_id(cl,cloud_id);
-					t->cloud = c;
-				} else {
-					if(db_fail)
-						task_done(t,ERROR_FATAL);
-				}
-				break;
-			case 1:	// Creamos la suscripcion en la nube Mysql
-				susc_id = dictionary_get(t->data,"susc_id");
-				if(db_get_cloud_id(db,atoi(susc_id),C_MYSQLDB,&cloud_id,&db_fail)){
-					c = list_cloud_find_id(cl,cloud_id);
-					t->cloud = c;
-				} else {
-					if(db_fail)
-						task_done(t,ERROR_FATAL);
-				}
-				break;
-			case 2:	// Creamos la suscripcion en la nube MSsql
-				susc_id = dictionary_get(t->data,"susc_id");
-				if(db_get_cloud_id(db,atoi(susc_id),C_MSSQLDB,&cloud_id,&db_fail)){
-					c = list_cloud_find_id(cl,cloud_id);
-					t->cloud = c;
-				} else {
-					if(db_fail)
-						task_done(t,ERROR_FATAL);
-				}
-				break;
-			case 3:	// Creamos la suscripcion en la base de datos
-				if(!db_susc_add(db,t->data,result,&db_fail))
-					task_done(t,"{\"code\":\"211\",\"info\":\"Suscripcion agregada\"}");
-				break;
-		}
-		if(t->step < 3 && t->cloud != NULL){
-			sprintf(send_message,"0susc_id|%s", susc_id);
-			task_cloud_send(t,send_message);	//Esto me coloca el estado en T_WAITING
-		}
-		t->step ++;	// dejo preparado para ejecutar el paso siguiente
-	} else if(t->status == T_WAITING){
-		task_cloud_get(t);
-		if(t->status == T_DONE){
-			if(t->result_code == 200){
-				/* La llamada a la nube retorno que genero el alta
- 				 * pasamos al paso siguiente. */
-				t->status = T_TODO;
-			}
-		}
-	}
-}
-
-int task_susc_del(T_task *t, T_db *db, T_list_cloud *cl){
-	char result[100];
-	char *susc_id;
-	int cloud_id;
-	char send_message[100];
-	T_cloud *c = NULL;
-	int db_fail;
-
-	/* Verificamos que ese suscripción exista para el
- 	 * usuario indicado */
-
-	susc_id = dictionary_get(t->data,"susc_id");
-	if(t->status == T_TODO){
-		switch (t->step){
-			case 0:	// Borramos la suscripcion en la nube web
-				if(db_get_cloud_id(db,atoi(susc_id),C_WEB,&cloud_id,&db_fail)){
-					c = list_cloud_find_id(cl,cloud_id);
-					t->cloud = c;
-				} else {
-					if(db_fail)
-						task_done(t,ERROR_FATAL);
-				}
-				break;
-			case 1:	// Borramos la suscripcion en la nube Mysql
-				if(db_get_cloud_id(db,atoi(susc_id),C_MYSQLDB,&cloud_id,&db_fail)){
-					c = list_cloud_find_id(cl,cloud_id);
-					t->cloud = c;
-				} else {
-					if(db_fail)
-						task_done(t,ERROR_FATAL);
-				}
-				break;
-			case 2:	// Borramos la suscripcion en la nube MSSQL
-				if(db_get_cloud_id(db,atoi(susc_id),C_MSSQLDB,&cloud_id,&db_fail)){
-					c = list_cloud_find_id(cl,cloud_id);
-					t->cloud = c;
-				} else {
-					if(db_fail)
-						task_done(t,ERROR_FATAL);
-				}
-				break;
-			case 3:	// Borramos definitivamente de la base de datos
-				if(!db_susc_del(db,t->data,result,&db_fail))
-					task_done(t,result);
-				else
-					task_done(t,"{\"code\":\"212\",\"info\":\"Suscripcion eliminada\"}");
-		}
-		if(t->step < 3 && t->cloud != NULL){
-			sprintf(send_message,"1susc_id|%s", susc_id);
-			task_cloud_send(t,send_message);	//Esto me coloca el estado en T_WAITING
-		}
-		t->step ++;	// dejo preparado para ejecutar el paso siguiente
-	} else if(t->status == T_WAITING){
-		task_cloud_get(t);	//Esto me coloca el estado en T_DONE
-		if(t->status == T_DONE){
-			if(t->result_code == 200){
-				/* La llamada a la nube retorno que genero el alta
- 				 * pasamos al paso siguiente. */
-				t->status = T_TODO;
-			}
-		}
-	}
-}
-
-int task_susc_mod(T_task *t, T_db *db){
-	char result[100];
-	int db_fail;
-
-	if(db_susc_mod(db,t->data,result,&db_fail)){
-		task_done(t,"{\"code\":\"213\",\"info\":\"Suscripcion modificada\"}");
-	} else {
-		if(db_fail)
-			task_done(t,ERROR_FATAL);
-		else {
-			task_done(t,result);
-		}
-	}
-}
-
-void task_susc_show(T_task *t, T_db *db){
 	MYSQL_RES *result;
 	char error[200];
-	char *aux=NULL;
-	int db_fail;
+	MYSQL_ROW row;
 
-	/* Recolectamos los datos de la suscripcion global */
-	if(!db_susc_show(db,t->data,&result,error,&db_fail)){
-		if(db_fail)
+	if(t->status == T_TODO){
+		/* Detenemos sus suscripciones */
+		db_susc_list(db,t->data,&result,error,&db_fail);
+		if(!db_fail){
+			/*Detenemos la primer suscripcion del listado */
+			result = mysql_store_result(db->con);
+			if(mysql_num_rows(result)> 0){
+				/* Quedan suscripciones por detener */
+				row = mysql_fetch_row(result);
+				dictionary_add(t->data,"susc_id",row[0]);
+				task_susc_stop(t,db,cl);
+			} else {
+				/* Ya no tiene suscripciones por detener. Procedemos
+ 				   a detener el usuario */
+				db_user_stop(db,t->data,error,&db_fail);
+				if(db_fail){
+					task_done(t,ERROR_FATAL);
+				} else {
+					task_done(t,"{\"code\":\"224\",\"info\":\"Usuario inhabilitado\"}");
+				}
+			}
+		} else {
 			task_done(t,ERROR_FATAL);
-		else {
-			task_done(t,error);
 		}
-	} else {
-		json_susc_show(&aux,result);
-		task_done(t,aux);
+	} else if(t->status == T_WAITING){
+		task_susc_del(t,db,cl);
+		if(t->status == T_DONE){
+			dictionary_remove(t->data,"susc_id");
+			t->status == T_TODO;
+			t->step=0;
+		}
 	}
-	free(aux);
 }
 
-void task_susc_list(T_task *t, T_db *db){
+void task_user_start(T_task *t, T_db *db, T_list_cloud *cl){
+	int db_fail;
 	MYSQL_RES *result;
 	char error[200];
-	char *aux=NULL;
-	int db_fail;
+	MYSQL_ROW row;
 
-	printf("TASK_SUSC_LIST\n");
-	if(!db_susc_list(db,t->data,&result,error,&db_fail)){
-		if(db_fail)
+	if(t->status == T_TODO){
+		/* Detenemos sus suscripciones */
+		db_susc_list(db,t->data,&result,error,&db_fail);
+		if(!db_fail){
+			/*Detenemos la primer suscripcion del listado */
+			result = mysql_store_result(db->con);
+			if(mysql_num_rows(result)> 0){
+				/* Quedan suscripciones por detener */
+				row = mysql_fetch_row(result);
+				dictionary_add(t->data,"susc_id",row[0]);
+				task_susc_stop(t,db,cl);
+			} else {
+				/* Ya no tiene suscripciones por detener. Procedemos
+ 				   a detener el usuario */
+				db_user_stop(db,t->data,error,&db_fail);
+				if(db_fail){
+					task_done(t,ERROR_FATAL);
+				} else {
+					task_done(t,"{\"code\":\"224\",\"info\":\"Usuario habilitado\"}");
+				}
+			}
+		} else {
 			task_done(t,ERROR_FATAL);
-		else
-			task_done(t,error);
-	} else {
-		json_susc_list(&aux,result);
-		task_done(t,aux);
+		}
+	} else if(t->status == T_WAITING){
+		task_susc_del(t,db,cl);
+		if(t->status == T_DONE){
+			dictionary_remove(t->data,"susc_id");
+			t->status == T_TODO;
+			t->step=0;
+		}
 	}
-	free(aux);
 }
 
 void task_json_result(T_task *t, char **result){
@@ -386,6 +584,8 @@ void task_json_result(T_task *t, char **result){
 	*result=(char *)realloc(*result,strlen(t->result) + 200);
 	sprintf(*result,"{\"taskid\":\"%s\",\"status\":\"%s\",\"data\":%s}",t->id,aux,t->result);
 }
+
+/********************    TASK CLOUD   *****************************/
 
 int task_cloud_send(T_task *t, char *send_message){
 	/* Envia una solicitud a la nube. Se guarda el
@@ -453,10 +653,10 @@ int task_site_list(T_task *t, T_db *db){
 	int db_fail;
 	char message[200];
 
+	printf("TASK_SITE_LIST\n");
 	if(t->status == T_TODO){
 		if(db_susc_exist(db,t->data,message,&db_fail)){
-			sprintf(send_message,"lsusc_id|%s",
-				dictionary_get(t->data,"susc_id"));
+			sprintf(send_message,"lsusc_id|%s", dictionary_get(t->data,"susc_id"));
 			task_cloud_send(t,send_message);
 		} else {
 			if(db_fail)
@@ -501,15 +701,15 @@ int task_site_add(T_task *t, T_db *db){
  	 * la nube ya retorna en formato json el resultado */
 	char send_message[100];
 	int db_fail;
-	char message[200];
+	char error[200];
 
 	if(t->status == T_TODO){
 		/* Analizamos cantidad de sitios permitidos*/
-		if(!db_accept_add_site(db,t->data,message,&db_fail)){
+		if(!db_accept_add_site(db,t->data,error,&db_fail)){
 			if(db_fail)
 				task_done(t,ERROR_FATAL);
 			else
-				task_done(t,message);
+				task_done(t,error);
 		} else {
 			/* Enviamos la accion a la nube */
 			sprintf(send_message,"aname|%s|susc_id|%s",
@@ -527,10 +727,10 @@ int task_site_del(T_task *t, T_db *db){
 	/* Elimina fisica y logicamente un sitio */
 	char send_message[100];
 	int db_fail;
-	char message[200];
+	char error[200];
 
 	if(t->status == T_TODO){
-		if(db_susc_exist(db,t->data,message,&db_fail)){
+		if(db_susc_exist(db,t->data,error,&db_fail)){
 			sprintf(send_message,"dsusc_id|%s|site_id|%s",
 				dictionary_get(t->data,"susc_id"),
 				dictionary_get(t->data,"site_id"));
@@ -539,7 +739,7 @@ int task_site_del(T_task *t, T_db *db){
 			if(db_fail)
 				task_done(t,ERROR_FATAL);
 			else
-				task_done(t,message);
+				task_done(t,error);
 		}
 	} else if(t->status == T_WAITING){
 		task_cloud_get(t);
@@ -550,11 +750,12 @@ void task_site_mod(T_task *t, T_db *db){
 	/* Realiza modificaciones sobre un sitio */
 	char error[200];
 	int db_fail;
+	char send_message[200];
 
 	if(t->status == T_TODO){
 		/* Verificamos que la suscripcion
  		   sea del usuario */
-		if(db_susc_exist(db,d,error,*db_fail)){
+		if(db_susc_exist(db,t->data,error,&db_fail)){
 			sprintf(send_message,"msusc_id|%s|site_id|%s",
 			dictionary_get(t->data,"susc_id"),
 			dictionary_get(t->data,"site_id"));
@@ -563,12 +764,65 @@ void task_site_mod(T_task *t, T_db *db){
 			if(db_fail)
 				task_done(t,ERROR_FATAL);
 			else
-				task_done(t,message);
+				task_done(t,error);
 		}
 	} else if(t->status == T_WAITING){
 		task_cloud_get(t);
 	}
 }
+
+
+void task_site_stop(T_task *t, T_db *db){
+	/* Le indica a la nube detener un sitio */
+	char error[200];
+	int db_fail;
+	char send_message[200];
+
+	if(t->status == T_TODO){
+		/* Verificamos que la suscripcion
+ 		   sea del usuario */
+		if(db_susc_exist(db,t->data,error,&db_fail)){
+			sprintf(send_message,"ksusc_id|%s|site_id|%s",
+			dictionary_get(t->data,"susc_id"),
+			dictionary_get(t->data,"site_id"));
+			task_cloud_send(t,send_message);
+		} else {
+			if(db_fail)
+				task_done(t,ERROR_FATAL);
+			else
+				task_done(t,error);
+		}
+	} else if(t->status == T_WAITING){
+		task_cloud_get(t);
+	}
+}
+
+void task_site_start(T_task *t, T_db *db){
+	/* Le indica a la nube arrancar un sitio */
+	char error[200];
+	int db_fail;
+	char send_message[200];
+
+	if(t->status == T_TODO){
+		/* Verificamos que la suscripcion
+ 		   sea del usuario */
+		if(db_susc_exist(db,t->data,error,&db_fail)){
+			sprintf(send_message,"esusc_id|%s|site_id|%s",
+			dictionary_get(t->data,"susc_id"),
+			dictionary_get(t->data,"site_id"));
+			task_cloud_send(t,send_message);
+		} else {
+			if(db_fail)
+				task_done(t,ERROR_FATAL);
+			else
+				task_done(t,error);
+		}
+	} else if(t->status == T_WAITING){
+		task_cloud_get(t);
+	}
+}
+
+/***************************************************/
 
 void task_run(T_task *t, T_db *db, T_list_cloud *cl){
 	T_cloud *c;
@@ -585,6 +839,8 @@ void task_run(T_task *t, T_db *db, T_list_cloud *cl){
 			case T_USER_ADD: task_user_add(t,db); break;
 			case T_USER_MOD: task_user_mod(t,db); break;
 			case T_USER_DEL: task_user_del(t,db,cl); break;
+			case T_USER_STOP: task_user_stop(t,db,cl); break;
+			case T_USER_START: task_user_start(t,db,cl); break;
 	
 			/* SUSCRIPTION */
 			case T_SUSC_LIST: task_susc_list(t,db); break;
@@ -592,6 +848,8 @@ void task_run(T_task *t, T_db *db, T_list_cloud *cl){
 			case T_SUSC_ADD: task_susc_add(t,db,cl); break;
 			case T_SUSC_MOD: task_susc_mod(t,db); break;
 			case T_SUSC_DEL: task_susc_del(t,db,cl); break;
+			case T_SUSC_STOP: task_susc_stop(t,db,cl); break;
+			case T_SUSC_START: task_susc_start(t,db,cl); break;
 		}
 	} else {
 		/* Son acciones sobre alguna nube */
@@ -619,6 +877,8 @@ void task_run(T_task *t, T_db *db, T_list_cloud *cl){
 			case T_SITE_ADD: task_site_add(t,db); break;
 			case T_SITE_MOD: task_site_mod(t,db); break;
 			case T_SITE_DEL: task_site_del(t,db); break;
+			case T_SITE_STOP: task_site_stop(t,db); break;
+			case T_SITE_START: task_site_start(t,db); break;
 		}
 	}
 }

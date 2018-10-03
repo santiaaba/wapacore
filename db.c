@@ -88,7 +88,9 @@ int db_user_exist(T_db *db, T_dictionary *d, char *error, int *db_fail){
 	char sql[400];
 	MYSQL_RES *result;
 
-	sprintf(sql,"select id from user where id=%c",dictionary_get(d,"user_id"));
+	printf("DB_USER_EXIST\n");
+	sprintf(sql,"select id from user where id=%s",dictionary_get(d,"user_id"));
+	printf("DB_USER_EXIST: %s\n",sql);
 	mysql_query(db->con,sql);
 	if(mysql_errno(db->con)){
 		*db_fail = 1;
@@ -111,10 +113,12 @@ int db_susc_exist(T_db *db, T_dictionary *d, char *error, int *db_fail){
 	MYSQL_RES *result;
         MYSQL_ROW row;
 
+	printf("DB_SUSC_EXIST\n");
 	/* Verificamos primero existencia del usuario */
 	if(db_user_exist(db,d,error,db_fail)){
 		sprintf(sql,"select count(id) from suscription where id=%s and user_id=%s",
 			dictionary_get(d,"susc_id"),dictionary_get(d,"user_id"));
+		printf("DB_SUSC_EXIST: %s\n",sql);
 		mysql_query(db->con,sql);
 		if(mysql_errno(db->con)){
 			*db_fail = 1;
@@ -339,6 +343,45 @@ int db_user_mod(T_db *db, T_dictionary *d, char *error, int *db_fail){
 	return 1;
 }
 
+int db_user_stop(T_db *db, T_dictionary *d, char *error, int *db_fail){
+	/* Inhabilita en la base de datos un usuario.
+ 	   El usuario puede no exisitr */
+	char sql[100];
+
+	sprintf(sql,"update user set status=0 where id=%s",dictionary_get(d,"user_id"));
+	if(mysql_query(db->con,sql) != 0){
+		/* Algo fallo */
+		*db_fail=1;
+		return 0;
+	} else {
+		*db_fail=0;
+		if(mysql_affected_rows(db->con) == 1)
+			return 1;
+		else 
+			sprintf("error","Usuario no existe");
+			return 0;
+	}
+}
+
+int user_start(T_db *db, T_dictionary *d, char *error, int *db_fail){
+	/* habilita en la base de datos un usuario */
+	char sql[100];
+
+	sprintf(sql,"update user set status=1 where id=%s",dictionary_get(d,"user_id"));
+	if(mysql_query(db->con,sql) != 0){
+		/* Algo fallo */
+		*db_fail=1;
+		return 0;
+	} else {
+		*db_fail=0;
+		if(mysql_affected_rows(db->con) == 1)
+			return 1;
+		else 
+			sprintf("error","Usuario no existe");
+			return 0;
+	}
+}
+
 int db_susc_add(T_db *db, T_dictionary *d, char *error, int *db_fail){
 	/* Agrega una suscripcion a la base de datos. Si pudo
  	 * agregarla retorna 1. Si no pudo 0 */
@@ -423,6 +466,8 @@ int db_susc_add(T_db *db, T_dictionary *d, char *error, int *db_fail){
 
 int db_susc_mod(T_db *db, T_dictionary *d, char *error, int *db_fail){
 	/* Modifica una suscripcion. */
+	/* No verifica que exista la suscripcion. Es responsabilidad
+ 	 * de la funcion llamadora */
 
 	char sql[200];
 	char sql_aux[200];
@@ -464,6 +509,9 @@ int db_susc_mod(T_db *db, T_dictionary *d, char *error, int *db_fail){
 }
 
 int db_susc_del(T_db *db, T_dictionary *d, char *error, int *db_fail){
+	/* Elimina una suscripcion de la base de datos.
+ 	 * No verifica si la suscripcion existe o es del usuario correcto,
+ 	 * es responsabilidad de la funcion llamadora */
 
 	char sql[200];
 
@@ -490,6 +538,37 @@ int db_susc_del(T_db *db, T_dictionary *d, char *error, int *db_fail){
 
 	/* Eliminado suscripcion */
 	sprintf(sql,"delete from suscription where id=%s",dictionary_get(d,"susc_id"));
+	if(0 != mysql_query(db->con,sql)){
+		*db_fail=1;
+		return 0;
+	}
+	*db_fail=0;
+	return 1;
+}
+
+int db_susc_stop(T_db *db, T_dictionary *d, char *error, int *db_fail){
+	/* Detenemos las suscripciones en la base de datos */
+	/* NO verifica la existencia de la suscripcion o a que
+ 	 * usuario corresponde. Es responsabilidad de la funcion llamadora */
+	char sql[200];
+
+	sprintf(sql,"update suscription set status=0 where id=%s",dictionary_get(d,"susc_id"));
+	if(0 != mysql_query(db->con,sql)){
+		*db_fail=1;
+		return 0;
+	}
+	*db_fail=0;
+	return 1;
+
+}
+
+int db_susc_start(T_db *db, T_dictionary *d, char *error, int *db_fail){
+	/* Iniciamos las suscripciones en la base de datos */
+	/* NO verifica la existencia de la suscripcion 
+ 	 * usuario corresponde. Es responsabilidad de la funcion llamadora */
+	char sql[200];
+
+	sprintf(sql,"update suscription set status=1 where id=%s",dictionary_get(d,"susc_id"));
 	if(0 != mysql_query(db->con,sql)){
 		*db_fail=1;
 		return 0;

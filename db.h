@@ -35,6 +35,8 @@ int db_user_show(T_db *db, T_dictionary *d, MYSQL_RES **result, char *error, int
 int db_user_add(T_db *db, T_dictionary *d, char *error, int *db_fail);
 int db_user_mod(T_db *db, T_dictionary *d, char *error, int *db_fail);
 int db_user_exist(T_db *db, T_dictionary *d, char *error, int *db_fail);
+int db_user_stop(T_db *db, T_dictionary *d, char *error, int *db_fail);
+int db_user_start(T_db *db, T_dictionary *d, char *error, int *db_fail);
 
 /* SUSCRIPTION */
 int db_susc_list(T_db *db, T_dictionary *d, MYSQL_RES **result, char *error, int *db_fail);
