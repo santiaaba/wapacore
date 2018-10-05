@@ -128,7 +128,7 @@ int task_susc_add(T_task *t, T_db *db, T_list_cloud *cl){
 				t->cloud = c;
 				sprintf(send_message,"0susc_id|%s", susc_id);
 				if(!task_cloud_send(t,send_message)){
-					printf("Nube no responde\n");
+					printf("Nube no responde %i\n",t->step);
 					/* No pudimons contactar a una de las nubes
  					   a la que si debiamos poder hacerlo */
 					/* Debemos realizar un rollback eliminando la
