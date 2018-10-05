@@ -465,7 +465,7 @@ int db_susc_add(T_db *db, T_dictionary *d, char *error, int *db_fail){
 
 	printf("paso 6\n");
 	// Paso todos los chequeos. Lo damos de alta
-	sprintf(sql,"insert into suscription(user_id,plan_id,name,status) values(%s,%s,'%s',0)",
+	sprintf(sql,"insert into suscription(user_id,plan_id,name) values(%s,%s,'%s')",
 	dictionary_get(d,"user_id"),dictionary_get(d,"plan_id"),plan_name);
 	if(mysql_query(db->con,sql)){
 		*db_fail=1;
