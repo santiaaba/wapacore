@@ -10,9 +10,10 @@
  de datos en el parametro db_fail
  */
 
-void db_init(T_db *db, T_config *c){
+void db_init(T_db *db, T_config *c, T_logs *logs){
 	db->con = mysql_init(NULL);
 	db->status = DB_ONLINE;
+	db->logs = logs;
 	strcpy(db->user,c->db_user);
 	strcpy(db->pass,c->db_pass);
 	strcpy(db->host,c->db_server);
@@ -52,7 +53,7 @@ int db_load_clouds(T_db *db, T_list_cloud *clouds){
 	}
 }
 
-int db_get_cloud_id(T_db *db, int susc_id, T_cloud_type t, int *cloud_id, int *db_fail){
+int db_get_cloud_id(T_db *db, char *susc_id, T_cloud_type t, int *cloud_id, char *error, int *db_fail){
 	/* Retorna el id en el parametro cloud_id de una nube en base al id de una
  	   suscripcion pasada en el parametro susc_id. db_fail retorna si hubo falla
  	   Recordar que un plan puede tener varias nubes pero no mas de una de cada
@@ -62,23 +63,26 @@ int db_get_cloud_id(T_db *db, int susc_id, T_cloud_type t, int *cloud_id, int *d
 	MYSQL_RES *result;
 	MYSQL_ROW row;
 
-	sprintf(sql,"select n.id from nube n inner join plan_nube p on (n.id = p.id_nube) inner join plan pp on (p.id_plan = pp.id) inner join suscription s on (pp.id = s.plan_id) where s.id=%i and n.tipo=%i",susc_id,t);
+	*cloud_id=0;
+	sprintf(sql,"select n.id from nube n inner join plan_nube p on (n.id = p.id_nube) inner join plan pp on (p.id_plan = pp.id) inner join suscription s on (pp.id = s.plan_id) where s.id=%s and n.tipo=%i",susc_id,t);
 
-	mysql_query(db->con,sql);
-	if(mysql_errno(db->con)){
+	printf("db_get_cloud_id: %s\n",sql);
+	if(mysql_query(db->con,sql)){
 		*db_fail = 1;
 		return 0;
 	}
+	printf("PASO A\n");
 	*db_fail = 0;
 	result = mysql_store_result(db->con);
-	*cloud_id=0;
-	row = mysql_fetch_row(result);
-	if(row){
-		*cloud_id=atoi(row[0]);
-		return 1;
-	} else {
+	if((mysql_num_rows(result) == 0)){
+		sprintf(error,"{\"code\":\"350\",\"info\":\"Nube no existe\"}");
 		return 0;
 	}
+	printf("PASO B\n");
+	row = mysql_fetch_row(result);
+	*cloud_id=atoi(row[0]);
+	printf("PASO C\n");
+	return 1;
 }
 
 int db_user_exist(T_db *db, T_dictionary *d, char *error, int *db_fail){
@@ -363,7 +367,7 @@ int db_user_stop(T_db *db, T_dictionary *d, char *error, int *db_fail){
 	}
 }
 
-int user_start(T_db *db, T_dictionary *d, char *error, int *db_fail){
+int db_user_start(T_db *db, T_dictionary *d, char *error, int *db_fail){
 	/* habilita en la base de datos un usuario */
 	char sql[100];
 
@@ -384,7 +388,10 @@ int user_start(T_db *db, T_dictionary *d, char *error, int *db_fail){
 
 int db_susc_add(T_db *db, T_dictionary *d, char *error, int *db_fail){
 	/* Agrega una suscripcion a la base de datos. Si pudo
- 	 * agregarla retorna 1. Si no pudo 0 */
+ 	 * agregarla retorna 0 y suma al diccionario su valor bajo
+ 	 * la key "susc_id". Si no pudo retorna 0 */
+	/* Si la base falla retorna db_fail = 1. Caso contrario 0. */
+	/* No realiza verificaciones. Ver funcion db_susc_add_ok */
 
 	MYSQL_RES *result;
 	MYSQL_ROW row;
@@ -395,71 +402,94 @@ int db_susc_add(T_db *db, T_dictionary *d, char *error, int *db_fail){
 	int max;
 	my_ulonglong susc_id;
 
+	*db_fail=0;
+	printf("DB_SUSC_ADD\n");
 	// Verificamos la existencia del usuario
 	sprintf(sql,"select id,status from user where id=%s",dictionary_get(d,"user_id"));
-	mysql_query(db->con,sql);
-	result = mysql_store_result(db->con);
-	if(!result){
+	if(mysql_query(db->con,sql)){
 		*db_fail=1;
 		return 0;
 	}
+	result = mysql_store_result(db->con);
+	if(mysql_num_rows(result) == 0){
+		strcpy(error,"{\"code\":\"320\",\"info\":\"Usuario inexistente\"}");
+		return 0;
+	}
+	printf("paso 1\n");
 	// Verificamos que el usuario este activo
 	row = mysql_fetch_row(result);
-	if(atoi(row[1]) > 0){
+	if(atoi(row[1]) == 0){
 		strcpy(error,"{\"code\":\"322\",\"info\":\"Usuario inactivo\"}");
 		return 0;
 	}
 	
+	printf("paso 2\n");
 	// Verificamos la existencia del plan
-	sprintf(sql,"select count(id) from plan where id=%s",dictionary_get(d,"plan_id"));
-	mysql_free_result(result);
-	mysql_query(db->con,sql);
-	result = mysql_store_result(db->con);
-	if(!result){
+	sprintf(sql,"select id,max,status from plan where id=%s",dictionary_get(d,"plan_id"));
+	if(mysql_query(db->con,sql)){
 		*db_fail=1;
 		return 0;
 	}
-	if(mysql_fetch_row(result)==0){			// MMMMMMMM. Verificar
+	result = mysql_store_result(db->con);
+	if(mysql_num_rows(result) == 0){
 		strcpy(error,"{\"code\":\"330\",\"info\":\"Plan no existe\"}");
                 return 0;
 	}
 	// Verificamos que el plan este instanciable
+	printf("paso 3\n");
+	printf("paso 3\n");
 	row = mysql_fetch_row(result);
-	if(atoi(row[1]) > 0){
+	printf("paso 3 - %s\n",row[2]);
+	if(atoi(row[2]) == 0){
 		strcpy(error,"{\"code\":\"331\",\"info\":\"Plan no instanciable\"}");
                 return 0;
 	} else {
-		strcpy(plan_name,row[3]);
-		max = atoi(row[2]);
+		max = atoi(row[1]);
 	}
 	
+	printf("paso 4\n");
 	// Verificamos que el usuario no supere la cantidad de instancias del mismo plan
 	sprintf(sql,"select count(*) from suscription where user_id=%s and plan_id=%s",
 		dictionary_get(d,"user_id"),dictionary_get(d,"plan_id"));
-	mysql_free_result(result);
-	mysql_query(db->con,sql);
-	result = mysql_store_result(db->con);
-	if(!result){
+	if(mysql_query(db->con,sql)){
 		*db_fail=1;
 		return 0;
 	}
+	printf("paso 5\n");
+	result = mysql_store_result(db->con);
+	row = mysql_fetch_row(result);
 	if(atoi(row[0]) > max){
 		strcpy(error,"{\"code\":\"332\",\"info\":\"Maximo de suscripciones para el plan alcanzado\"}");
 		return 0;
 	}
 
+	printf("paso 6\n");
 	// Paso todos los chequeos. Lo damos de alta
 	sprintf(sql,"insert into suscription(user_id,plan_id,name,status) values(%s,%s,'%s',0)",
 	dictionary_get(d,"user_id"),dictionary_get(d,"plan_id"),plan_name);
-	susc_id = mysql_insert_id(db->con);
-	if(0 != mysql_query(db->con,sql)){
+	if(mysql_query(db->con,sql)){
 		*db_fail=1;
 		return 0;
 	}
-
+	susc_id = mysql_insert_id(db->con);
+	printf("paso 7\n");
 	sprintf(susc_id_char,"%lu",susc_id);
+	printf("suscription_id nuevo %s\n",susc_id_char);
 	dictionary_add(d,"susc_id",susc_id_char);
 	strcpy(error,"{\"code\":\"211\",\"info\":\"Suscripcion agregada\"}");
+	*db_fail=0;
+	return 1;
+}
+
+int db_susc_add_active(T_db *db, T_dictionary *d, char *error, int *db_fail){
+	/* Luego de la creacion de la suscripcion y de sus nubes... hay que activarla */
+
+	char sql[200];
+	sprintf(sql,"update suscription set status=1 where id=%s",dictionary_get(d,"susc_id"));
+	if(mysql_query(db->con,sql)){
+		*db_fail=1;
+		return 0;
+	}
 	*db_fail=0;
 	return 1;
 }

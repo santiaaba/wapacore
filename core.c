@@ -28,6 +28,7 @@ T_config config;
 T_db db;
 T_rest_server rest_server;
 T_list_cloud clouds;
+T_logs logs;
 
 void main(){
 
@@ -36,9 +37,15 @@ void main(){
 	//Levantamos la configuracion 
 	if(!config_load("core.conf",&config))
 		exit(1);
+
+	if(!logs_init(&logs,config_logs_file(&config),config_logs_level(&config))){
+		exit(1);
+	}
+	logs_write(&logs,L_INFO,"Start Core","");
+
 	printf("Conectamos base de datos\n");
 	// Conectamos contra la base de datos
-	db_init(&db,&config);
+	db_init(&db,&config,&logs);
 
 	if (!db_connect(&db)){
 		printf("Imposible conectar a la base de datos\n");

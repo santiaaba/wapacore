@@ -33,6 +33,7 @@ typedef struct t_r_server {
 	pthread_t do_task;
 	pthread_mutex_t mutex_heap_task;
 	pthread_mutex_t mutex_bag_task;
+	T_logs *logs;
 	T_db *db;
 	T_list_cloud *clouds;
 	} T_rest_server;
@@ -41,6 +42,7 @@ typedef struct t_r_server {
  * el cual utiliza esta libreria. Guarda que estas variables
  * se encuentran en LA ZONA CRITICA de los hilos */
 extern T_rest_server rest_server;
+extern T_logs logs;
 
 void rest_server_init(T_rest_server *r, T_db *db, T_list_cloud *cl);
 void rest_server_add_task(T_rest_server *r, T_task *j);

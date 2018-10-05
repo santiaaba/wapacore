@@ -95,12 +95,9 @@ int check_data_susc_add(T_dictionary *data, char *result){
 	/* Verifica que los parametros esten todos y que
  	 * tengan un formato correcto. En *result retorna
  	 * el error en formato json de ser necesario */
+	printf("Validando informacion alta de sitio");
 	if(!valid_id(dictionary_get(data,"plan_id"))){
 		strcpy(result,"{\"task\":\"\",\"stauts\":\"ERROR\",\"data\":\"plan_id invalido\"}");
-		return 0;
-	}
-	if(!valid_id(dictionary_get(data,"susc_id"))){
-		strcpy(result,"{\"task\":\"\",\"stauts\":\"ERROR\",\"data\":\"susc_id invalido\"}");
 		return 0;
 	}
 	return 1;
@@ -216,8 +213,10 @@ static int handle_POST(struct MHD_Connection *connection,
 	char value[100];
 	char *result = (char *)malloc(TASKRESULT_SIZE);
 	unsigned int size_result = TASKRESULT_SIZE;
-	T_task *task;
+	T_task *task=NULL;
 	T_taskid *taskid;
+
+	printf("Handle_post ENTRO\n");
 
 	/* El token de momento lo inventamos
  	   pero deberia venir en el header del mensaje */
@@ -242,9 +241,10 @@ static int handle_POST(struct MHD_Connection *connection,
 			rest_server_url_error(result,&ok);
 		} else {
 			if(ok = check_data_plan_add(con_info->data,result))
-				task_init(task,&token,T_PLAN_ADD, con_info->data);
+				task_init(task,&token,T_PLAN_ADD, con_info->data,&logs);
 		}
 	/* PARA LOS USUARIOS */
+	printf("Handle_POST usuarios\n");
 	} else if(0 == strcmp("users",value)){
 		parce_data((char *)url,'/',&pos,value);
 		if(strlen(value)>0){
@@ -253,32 +253,35 @@ static int handle_POST(struct MHD_Connection *connection,
 			if(strlen(value)>0){
 				/* PARA LAS SUSCRIPCIONES DEL USUARIO */
 				if(0 == strcmp("susc",value)){
+					printf("Handle_POST suscripciones\n");
 					parce_data((char *)url,'/',&pos,value);
 					if(strlen(value)>0){
 						dictionary_add(con_info->data,"susc_id",value);
 						parce_data((char *)url,'/',&pos,value);
 						if(0 == strcmp("sites",value)){
+							printf("Handle_POST sitios\n");
 							parce_data((char *)url,'/',&pos,value);
 							if(strlen(value)>0){
 								dictionary_add(con_info->data,"site_id",value);
 								/* EDICION SITIO */
 								if(ok = check_data_site_mod(con_info->data,result))
-									task_init(task,&token,T_SITE_MOD,con_info->data);
+									task_init(task,&token,T_SITE_MOD,con_info->data,&logs);
 							} else {
 								/* ALTA SITIO */
 								if(ok = check_data_site_add(con_info->data,result))
-									task_init(task,&token,T_SITE_ADD,con_info->data);
+									task_init(task,&token,T_SITE_ADD,con_info->data,&logs);
 							}
 						} else {
 							/* EDICION SUSCRIPCIONES */
 							dictionary_add(con_info->data,"susc_id",value);
 							if(ok = check_data_susc_mod(con_info->data,result))
-								task_init(task,&token,T_SUSC_MOD,con_info->data);
+								task_init(task,&token,T_SUSC_MOD,con_info->data,&logs);
 						}
 					} else {
 						/* ALTA SUSCRIPCIONES */
+						printf("Handle_POST alta suscripcion\n");
 						if(ok = check_data_susc_add(con_info->data,result))
-							task_init(task,&token,T_SUSC_ADD,con_info->data);
+							task_init(task,&token,T_SUSC_ADD,con_info->data,&logs);
 					}
 				} else {
 					rest_server_url_error(result,&ok);
@@ -286,12 +289,12 @@ static int handle_POST(struct MHD_Connection *connection,
 			} else {
 				/* EDICION DE USUARIO */
 				if(ok = check_data_user_mod(con_info->data,result))
-					task_init(task,&token,T_USER_MOD,con_info->data);
+					task_init(task,&token,T_USER_MOD,con_info->data,&logs);
 			}
 		} else {
 			/* ALTA DE USUARIO */
 			if(ok = check_data_user_add(con_info->data,result))
-				task_init(task,&token,T_USER_ADD,con_info->data);
+				task_init(task,&token,T_USER_ADD,con_info->data,&logs);
 		}
 	/* CUALQUIER OTRA COSA. ERROR */
 	} else {
@@ -303,8 +306,6 @@ static int handle_POST(struct MHD_Connection *connection,
 	if(ok){
 		rest_server_add_task(&rest_server,task);
 		sprintf(result,"{\"task\":\"%s\",\"status\":\"TODO\"}",task_get_id(task));
-	} else {
-		task_destroy(&task);
 	}
 	send_page (connection,result);
 	return ok;
@@ -334,7 +335,7 @@ static int handle_DELETE(struct MHD_Connection *connection, const char *url){
 		parce_data((char *)url,'/',&pos,value);
 		if(strlen(value)> 0){
 			/* BORRAR PLAN */
-			task_init(task,&token,T_PLAN_DEL,data);
+			task_init(task,&token,T_PLAN_DEL,data,&logs);
 		} else {
 			rest_server_url_error(result,&ok);
 		}
@@ -356,13 +357,13 @@ static int handle_DELETE(struct MHD_Connection *connection, const char *url){
 							if(strlen(value)>0) {
 								/* BORRADO SITIO */
 								dictionary_add(data,"site_id",value);
-								task_init(task,&token,T_SITE_DEL,data);
+								task_init(task,&token,T_SITE_DEL,data,&logs);
 							} else {
 								rest_server_url_error(result,&ok);
 							}
 						} else {
 							/* BORRADO SUSCRIPCION */
-							task_init(task,&token,T_SUSC_DEL,data);
+							task_init(task,&token,T_SUSC_DEL,data,&logs);
 						}
 					} else {
 						rest_server_url_error(result,&ok);
@@ -372,7 +373,7 @@ static int handle_DELETE(struct MHD_Connection *connection, const char *url){
 				}
 			} else {
 				/* BORRAR USUARIO */
-				task_init(task,&token,T_USER_DEL,data);
+				task_init(task,&token,T_USER_DEL,data,&logs);
 			}
 		} else {
 			rest_server_url_error(result,&ok);
@@ -402,6 +403,8 @@ static int handle_GET(struct MHD_Connection *connection, const char *url){
 
 	/* El token de momento lo inventamos
  	   pero deberia venir en el header del mensaje */
+	printf("Handle_get ENTRO\n");
+
 	T_tasktoken token;
 	random_token(token);
 
@@ -415,12 +418,13 @@ static int handle_GET(struct MHD_Connection *connection, const char *url){
 			data = malloc(sizeof(T_dictionary));
 			dictionary_init(data);
 			dictionary_add(data,"id",value);
-			task_init(task,&token,T_PLAN_SHOW,data);
+			task_init(task,&token,T_PLAN_SHOW,data,&logs);
 		} else {
-			task_init(task,&token,T_PLAN_LIST,NULL);
+			task_init(task,&token,T_PLAN_LIST,NULL,&logs);
 		}
 
 	/* PARA LOS USUARIOS */
+	printf("Handle_GET usuarios\n");
 	} else if(0 == strcmp("users",value)) {
 		parce_data((char *)url,'/',&pos,value);
 		if(strlen(value)>0){
@@ -430,6 +434,7 @@ static int handle_GET(struct MHD_Connection *connection, const char *url){
 			parce_data((char *)url,'/',&pos,value);
 			if(strlen(value)>0){
 				/* PARA LAS SUSCRIPCIONES DEL USUARIO */
+				printf("Handle_GET suscripciones\n");
 				if(0 == strcmp("susc",value)) {
 					parce_data((char *)url,'/',&pos,value);
 					if(strlen(value)>0){
@@ -439,14 +444,15 @@ static int handle_GET(struct MHD_Connection *connection, const char *url){
 							if(0 == strcmp("sites",value)){
 								parce_data((char *)url,'/',&pos,value);
 								if(strlen(value)>0){
+									printf("Handle_GET sitios web\n");
 									/* Show site */
 									dictionary_add(data,"site_id",value);
 									if(ok = check_site_show(data,result))
-										task_init(task,&token,T_SITE_SHOW,data);
+										task_init(task,&token,T_SITE_SHOW,data,&logs);
 								} else {
 									/* Listado de sitios */
 									if(ok = check_site_list(data,result))
-										task_init(task,&token,T_SITE_LIST,data);
+										task_init(task,&token,T_SITE_LIST,data,&logs);
 								}
 							} else {
 								rest_server_url_error(result,&ok);
@@ -454,11 +460,11 @@ static int handle_GET(struct MHD_Connection *connection, const char *url){
 						} else {
 							/* Informacion de una suscripcion */
 							if(ok = (check_susc_show(data,result)))
-								task_init(task,&token,T_SUSC_SHOW,data);
+								task_init(task,&token,T_SUSC_SHOW,data,&logs);
 						}
 					} else {
 						/* Listado suscripciones de un usuario*/
-						task_init(task,&token,T_SUSC_LIST,data);
+						task_init(task,&token,T_SUSC_LIST,data,&logs);
 					}
 				} else {
 					rest_server_url_error(result,&ok);
@@ -466,10 +472,12 @@ static int handle_GET(struct MHD_Connection *connection, const char *url){
 			} else {
 				/* Informacion sobre un usuario */
 				if(ok = check_user_show(data,result))
-					task_init(task,&token,T_USER_SHOW,data);
+					task_init(task,&token,T_USER_SHOW,data,&logs);
 			}
 		} else {
-			task_init(task,&token,T_USER_LIST,NULL);
+			/* Listado de usuarios */
+			printf("Handle_GET listado usuarios\n");
+			task_init(task,&token,T_USER_LIST,NULL,&logs);
 		}
 
 	/* PARA LOS TASK */
@@ -510,6 +518,7 @@ static int iterate_post (void *coninfo_cls, enum MHD_ValueKind kind, const char 
 	struct connection_info_struct *con_info = coninfo_cls;
 
 	if(strlen(data)>0){
+		printf("iterate_post: Agregamos al diccionario %s->%s\n",(char *)key,(char *)data);
 		dictionary_add(con_info->data,(char *)key,(char *)data);
 		return MHD_YES;
 	} else {

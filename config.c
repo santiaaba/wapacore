@@ -43,11 +43,13 @@ int config_load(const char *filename, T_config *conf){
 			if(0 == strcmp(&atr[0],"db_name")){strcpy(conf->db_name,&val[0]);}
 			if(0 == strcmp(&atr[0],"db_user")){strcpy(conf->db_user,&val[0]);}
 			if(0 == strcmp(&atr[0],"db_pass")){strcpy(conf->db_pass,&val[0]);}
+			if(0 == strcmp(&atr[0],"log_file")){strcpy(conf->logs_file,&val[0]);}
+                        if(0 == strcmp(&atr[0],"log_level")){conf->logs_level = logs_str2level(&val[0]);}
 		}
 		fclose(fp);
 		return 1;
 	} else {
-		printf("Imposible habrir el archivo de configuracion %s\n",filename);
+		printf("Imposible abrir el archivo de configuracion \"%s\"\n",filename);
 		return 0;
 	}
 }
@@ -63,4 +65,10 @@ char *config_db_user(T_config *conf){
 }
 char *config_db_pass(T_config *conf){
 	return conf->db_pass;
+}
+char *config_logs_file(T_config *conf){
+	return conf->logs_file;
+}
+T_logs_level config_logs_level(T_config *conf){
+	return conf->logs_level;
 }

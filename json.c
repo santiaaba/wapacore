@@ -4,17 +4,22 @@ int json_user_list(char **data, MYSQL_RES *result){
 
 	MYSQL_ROW row;
 	int size=100;
+	int a=0;
 	
 	*data = (char *) realloc(*data,size);
 	strcpy(*data,"{\"code\":\"200\",\"info\":[");
 	while ((row = mysql_fetch_row(result))){
+		a++;
 		if((strlen(*data)) + strlen(row[0]) + 5 > size){
 			size = size + 100;
 			*data = (char *) realloc(*data,size);
 		}
 		sprintf(*data,"%s%s,",*data,row[0]);
 	}
-	(*data)[strlen(*data)-1] = ']';
+	if(a)
+		(*data)[strlen(*data)-1] = ']';
+	else
+		strcat(*data,"]");
 }
 
 int json_user_show(char **data, MYSQL_RES *result){
@@ -53,12 +58,14 @@ int json_susc_list(char **data, MYSQL_RES *result){
 
 	MYSQL_ROW row;
 	int size=0;
+	int a;
 	
 	size = size + 100;
 	*data = (char *) realloc(*data,size);
 	strcpy(*data,"{\"code\":\"200\",\"info\":[");
 	printf("Al menos aca %p\n",result);
 	while ((row = mysql_fetch_row(result))){
+		a++;
 		printf("ROW: %p\n",row);
 		if((80 + strlen(*data)) > size){
 			size = size + 100;
@@ -67,7 +74,10 @@ int json_susc_list(char **data, MYSQL_RES *result){
 		printf("Utilizamos el sprintf\n");
 		sprintf(*data,"%s{\"id\":\"%s\",\"name\":\"%s\",\"plan_name\":\"%s\"},",*data,row[0],row[1],row[2]);
 	}
-	(*data)[strlen(*data)-1] = ']';
+	if(a)
+		(*data)[strlen(*data)-1] = ']';
+	else
+		strcat(*data,"]");
 }
 
 int json_susc_show(char **message, MYSQL_RES *result){

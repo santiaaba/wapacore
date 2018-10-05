@@ -103,9 +103,11 @@ void dictionary_clean(T_dictionary *d){
 void dictionary_print(T_dictionary *d){
 	dictionary_node *aux;
 
-	aux = d->first;
-	while(aux!=NULL){
-		printf("diccionario: \"%s\" = \"%s\"\n",aux->key,aux->value);
-		aux = aux->next;
+	if(d!=NULL){
+		aux = d->first;
+		while(aux!=NULL){
+			printf("diccionario: \"%s\" = \"%s\"\n",aux->key,aux->value);
+			aux = aux->next;
+		}
 	}
 }

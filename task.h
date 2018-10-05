@@ -1,12 +1,13 @@
 #include <stdio.h>
 #include <pthread.h>
+#include <time.h>
+#include <string.h>
 #include "parce.h"
 #include "json.h"
 #include "dictionary.h"
 #include "cloud.h"
-#include <string.h>
 #include "db.h"
-#include <time.h>
+#include "logs.h"
 
 #ifndef JOB_H
 #define JOB_H
@@ -93,12 +94,13 @@ typedef struct {
 	T_task_status status;		//estado del task
 	T_dictionary *data;		//datos necesarios para realizar la accion
 	T_cloud *cloud;			//Cuando interviene una nube... queda asignada
+	T_logs *logs;
 	int step;			// Para acciones que involucran mas de un paso... indica el paso
 	int result_code;		//codigo obtenido de la nube. Se inicializa en 0.
 	char *result;			//resultado en formato json para retornar.
 } T_task;
 
-void task_init(T_task *t, T_tasktoken *token, T_task_type type, T_dictionary *data);
+void task_init(T_task *t, T_tasktoken *token, T_task_type type, T_dictionary *data, T_logs *logs);
 void task_destroy(T_task **t);
 void task_run(T_task *t, T_db *db, T_list_cloud *cl);
 T_tasktoken *task_get_token(T_task *t);
