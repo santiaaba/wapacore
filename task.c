@@ -110,6 +110,7 @@ int task_susc_add(T_task *t, T_db *db, T_list_cloud *cl){
 				else
 					task_done(t,error);
 			}
+			printf("listo agregado suscripcion\n");
 		} else if(t->step > 0 && t->step < 4){
 			/* Accionamos sobre las nubes */
 			printf("Acciones sobre la nube. Paso: %i\n",t->step);
@@ -129,27 +130,26 @@ int task_susc_add(T_task *t, T_db *db, T_list_cloud *cl){
 				sprintf(send_message,"0susc_id|%s", susc_id);
 				if(!task_cloud_send(t,send_message)){
 					printf("Nube no responde %i\n",t->step);
-					/* No pudimons contactar a una de las nubes
- 					   a la que si debiamos poder hacerlo */
-					/* Debemos realizar un rollback eliminando la
- 					   suscripcion creada anteriormente */
-					if(!db_susc_add_rollback(db,t->data),error,&db_fail){
-						if(db_fail){
+					/* Cambiamos es estado de la suscripcion a borken */
+					/* Toda suscripcion en broken debe ser revisada */
+					if(!db_susc_broken(db,t->data,error,&db_fail)){
+						if(db_fail)
 							task_done(t,ERROR_FATAL);
 						else
 							task_done(t,error);
+					} else {
+						task_done(t,"{\"code\":\"300\",\"info\":\"Nube inaccesible\"}");
 					}
 				}
-				printf("Terminamos enviar mensaje a nube\n");
-			} else {
-				printf("La suscripcion no tiene nube %i\n",t->step);
 			}
 		}
 		if(t->step == 4){
 			/* Hemos podido crear la suscripcion. Hemos podido crear la suscripcion en
- 			 * las distintas nubes. Activamos definitivamente la suscripcion */
+ 			 * las distintas nubes. Posiblemente no todas. Se ser así entonces la
+ 			 * suscripcion figura rota. Activamos definitivamente la suscripcion si
+ 			 * no es así. */
 			if(!db_susc_add_active(db,t->data,error,&db_fail)){
-				if(db_fail){
+				if(db_fail)
 					task_done(t,ERROR_FATAL);
 				else
 					task_done(t,error);
@@ -169,6 +169,14 @@ int task_susc_add(T_task *t, T_db *db, T_list_cloud *cl){
 					t->status = T_TODO;
 				} else {
 					task_done(t,"{\"code\":\"211\",\"info\":\"Suscripcion agregada\"}");
+				}
+			} else {
+				/* Error retornado por la nube */
+				if(!db_susc_broken(db,t->data,error,&db_fail)){
+					if(db_fail)
+						task_done(t,ERROR_FATAL);
+					else
+						task_done(t,error);
 				}
 			}
 		}

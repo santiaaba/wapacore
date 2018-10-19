@@ -386,6 +386,20 @@ int db_user_start(T_db *db, T_dictionary *d, char *error, int *db_fail){
 	}
 }
 
+int db_susc_broken(T_db *db, T_dictionary *d, char *error, int *db_fail){
+	/* Coloca una suscripcion en Broken */
+
+	char sql[100];
+	sprintf(sql,"update suscription set status=3 where id=%s",dictionary_get(d,"susc_id"));
+	printf(sql);
+	if(mysql_query(db->con,sql)){
+		*db_fail=1;
+		return 0;
+	}
+	*db_fail=0;
+	return 1;
+}
+
 int db_susc_add(T_db *db, T_dictionary *d, char *error, int *db_fail){
 	/* Agrega una suscripcion a la base de datos. Si pudo
  	 * agregarla retorna 0 y suma al diccionario su valor bajo
@@ -425,7 +439,7 @@ int db_susc_add(T_db *db, T_dictionary *d, char *error, int *db_fail){
 	
 	printf("paso 2\n");
 	// Verificamos la existencia del plan
-	sprintf(sql,"select id,max,status from plan where id=%s",dictionary_get(d,"plan_id"));
+	sprintf(sql,"select name,max,status from plan where id=%s",dictionary_get(d,"plan_id"));
 	if(mysql_query(db->con,sql)){
 		*db_fail=1;
 		return 0;
@@ -445,6 +459,7 @@ int db_susc_add(T_db *db, T_dictionary *d, char *error, int *db_fail){
                 return 0;
 	} else {
 		max = atoi(row[1]);
+		strcpy(plan_name,row[0]);
 	}
 	
 	printf("paso 4\n");
