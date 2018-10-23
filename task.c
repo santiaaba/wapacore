@@ -73,9 +73,12 @@ void task_print_status(T_task *t, char *s){
 
 void task_done(T_task *t, char *message){
 	/* Completa los datos para indicar que un task ha terminado */
+	printf("Entro\n");
 	t->status = T_DONE;
+	printf("Largo: %i\n",strlen(message)+1);
 	t->result=(char *)realloc(t->result,strlen(message)+1);
 	strcpy(t->result,message);
+	printf("PASO\n");
 }
 
 char *tob_get_id(T_task *t){
@@ -267,24 +270,79 @@ int task_susc_mod(T_task *t, T_db *db){
 	}
 }
 
-void task_susc_show(T_task *t, T_db *db){
-	MYSQL_RES *result;
-	char error[200];
+void task_susc_show(T_task *t, T_db *db, T_list_cloud *cl){
 	char *aux=NULL;
+	char error[200];
 	int db_fail;
+        int cloud_id;
+        T_cloud *c = NULL;
+        char send_message[100];
+	char *susc_id;
+	int ok;
 
-	/* Recolectamos los datos de la suscripcion global */
-	if(!db_susc_show(db,t->data,&result,error,&db_fail)){
-		if(db_fail)
-			task_done(t,ERROR_FATAL);
-		else {
-			task_done(t,error);
+	if(t->status == T_TODO){
+		if(t->step == 0){
+			/* Realizamos chequeos previos */
+			if(!db_susc_exist(db,t->data,error,&db_fail)){
+				if(db_fail)
+					task_done(t,ERROR_FATAL);
+				else
+					task_done(t,error);
+			}
+		} else if(t->step > 0 && t->step < 4){
+			susc_id = dictionary_get(t->data,"susc_id");
+			switch (t->step){
+				case 1: ok = db_get_cloud_id(db,susc_id,C_WEB,&cloud_id,error,&db_fail);
+					break;
+				case 2: ok = db_get_cloud_id(db,susc_id,C_MYSQLDB,&cloud_id,error,&db_fail);
+					break;
+				case 3: ok = db_get_cloud_id(db,susc_id,C_MSSQLDB,&cloud_id,error,&db_fail);
+					break;
+			}
+			if(ok){
+				c = list_cloud_find_id(cl,cloud_id);
+				t->cloud = c;
+				sprintf(send_message,"4susc_id|%s", susc_id);
+				task_cloud_send(t,send_message);
+			} else {
+				if(db_fail)
+					task_done(t,ERROR_FATAL);
+			}
+		} else if(t->step == 4){
+			/* Accionamos sobre el CORE */
+			if(!db_susc_show(db,t->data,&aux,error,&db_fail))
+				task_done(t,error);
+			else {
+				printf("Obtuvimos datos de la suscripcion: %s\n",aux);
+				aux = (char *)realloc(aux,strlen(aux) + strlen(t->result) + 3);
+				strcat(aux,t->result);
+				t->result = (char *)realloc(t->result,strlen(aux));
+				strcpy(t->result,aux);
+				strcat(t->result,"}}");
+				t->status = T_DONE;
+			}
+			free(aux);
 		}
-	} else {
-		json_susc_show(&aux,result);
-		task_done(t,aux);
+		t->step ++;	// dejo preparado para ejecutar el paso siguiente
+	} else if(t->status == T_WAITING){
+		aux = malloc(strlen(t->result));
+		strcpy(aux,t->result);
+		task_cloud_get(t);	//Esto me coloca el estado en T_DONE
+		printf("STATUS_CODE: %i\n",t->result_code);
+		if(t->result_code == 200){
+			//Agregamos los datos retornados por cada nube 
+			aux = (char *)realloc(aux,strlen(aux) + strlen(t->result));
+			strcat(aux,t->result);
+			printf("Obtuvimos datos de la la nube: %s\n",aux);
+			t->result = (char *)realloc(t->result,strlen(aux));
+			strcpy(t->result,aux);
+			t->status = T_TODO;
+		} else {
+			task_done(t,ERROR_FATAL);
+			printf("NO obtuvimos datos de la la nube\n");
+		}
+		free(aux);
 	}
-	free(aux);
 }
 
 void task_susc_list(T_task *t, T_db *db){
@@ -628,8 +686,13 @@ void task_json_result(T_task *t, char **result){
 	char aux[20];
 
 	task_print_status(t, aux);
-	*result=(char *)realloc(*result,strlen(t->result) + 200);
-	sprintf(*result,"{\"taskid\":\"%s\",\"status\":\"%s\",\"data\":%s}",t->id,aux,t->result);
+	if(t->status == T_DONE){
+		*result=(char *)realloc(*result,strlen(t->result) + 200);
+		sprintf(*result,"{\"taskid\":\"%s\",\"status\":\"%s\",\"data\":%s}",t->id,aux,t->result);
+	} else {
+		*result=(char *)realloc(*result,200);
+		sprintf(*result,"{\"taskid\":\"%s\",\"status\":\"%s\"}",t->id,aux);
+	}
 }
 
 /********************    TASK CLOUD   *****************************/
@@ -666,7 +729,7 @@ int task_cloud_get(T_task *t){
 	char send_message[100];
 	char *rcv_message = NULL;
 	char result_code[10];
-	int pos = 1;
+	int pos = 0;
 	uint32_t rcv_message_size = 0;
 
 	sprintf(send_message,"t%s",dictionary_get(t->data,"c_task_id"));
@@ -675,10 +738,9 @@ int task_cloud_get(T_task *t){
 			/* El task no ha terminado del lado de la nube */
 		} else if(rcv_message[0] == '1'){
 			parce_data(rcv_message + 1,'|',&pos,result_code);
+			printf("TASK_CLOUD_GET: %s\n",result_code);
 			t->result_code = atoi(result_code);
-			t->result=(char *)realloc(t->result,rcv_message_size - pos);
-			memcpy(t->result,&rcv_message[pos],rcv_message_size - pos);
-			task_done(t,"{\"code\":\"200\",\"info\":%s");
+			task_done(t,rcv_message+5);
 		} else {
 			/* deberia ser un 2. Entonces task no existe en la nube */
 			task_done(t,ERROR_TASK_CLOUD);
@@ -892,7 +954,7 @@ void task_run(T_task *t, T_db *db, T_list_cloud *cl){
 	
 			/* SUSCRIPTION */
 			case T_SUSC_LIST: task_susc_list(t,db); break;
-			case T_SUSC_SHOW: task_susc_show(t,db); break;
+			case T_SUSC_SHOW: task_susc_show(t,db,cl); break;
 			case T_SUSC_ADD: task_susc_add(t,db,cl); break;
 			case T_SUSC_MOD: task_susc_mod(t,db); break;
 			case T_SUSC_DEL: task_susc_del(t,db,cl); break;

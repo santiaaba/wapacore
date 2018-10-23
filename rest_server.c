@@ -134,7 +134,7 @@ void *rest_server_do_task(void *param){
 	T_rest_server *r= (T_rest_server *)param;
 
 	while(1){
-		sleep(10);
+		sleep(2);
 		pthread_mutex_lock(&(r->mutex_heap_task));
 			task = heap_task_pop(&(r->tasks_todo));
 		pthread_mutex_unlock(&(r->mutex_heap_task));

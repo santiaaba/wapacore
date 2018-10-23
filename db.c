@@ -169,26 +169,32 @@ int db_user_show(T_db *db, T_dictionary *d, MYSQL_RES **result, char *error, int
 	}
 }
 
-int db_susc_show(T_db *db, T_dictionary *d, MYSQL_RES **result, char *error, int *db_fail){
+int db_susc_show(T_db *db, T_dictionary *d, char **data, char *error, int *db_fail){
 	/* Retorna datos de la suscripcion en base al susc_id. Si no existe
  	   retorna 0. Si existe retorna 1. */
-	char sql[2000];
+	char sql[200];
+	char aux[400];
+	MYSQL_ROW row;
+	MYSQL_RES *result;
 
-	strcpy(sql,"select s.id, p.name as plan_name, s.name, s.status, w.hash_dir, wp.quota, wp.sites ");
-	strcat(sql,"from suscription s inner join plan p on (s.plan_id = p.id) ");
-	strcat(sql,"left join web_suscription w on (s.id = w.id) left join web_plan wp on (s.plan_id = wp.id) ");
-	strcat(sql, "where s.id=");
+	strcpy(sql,"select name,status,plan_id from suscription where id=");
 	strcat(sql,dictionary_get(d,"susc_id"));
+	printf("%s\n",sql);
 	mysql_query(db->con,sql);
 	if(mysql_errno(db->con)){
 		*db_fail = 1;
 		return 0;
 	}
 	*db_fail = 0;
-	*result = mysql_store_result(db->con);
-	if(mysql_num_rows(*result))
+	result = mysql_store_result(db->con);
+	if(mysql_num_rows(result)){
+		row = mysql_fetch_row(result);
+		sprintf(aux,"{\"code\":\"200\",\"info\":{\"name\":\"%s\",\"status\":\"%s\",\"plan_id\":\"%s\",\"clouds\":{",
+		row[0],row[1],row[2]);
+		*data = (char *)realloc(*data,strlen(aux)+1);
+		strcpy(*data,aux);
 		return 1;
-	else{
+	} else {
 		strcpy(error,"{\"code\":\"310\",\"info\":\"Suscipcion inexistente\"}");
 		return 0;
 	}

@@ -43,7 +43,7 @@ int db_user_start(T_db *db, T_dictionary *d, char *error, int *db_fail);
 /* SUSCRIPTION */
 int db_susc_broken(T_db *db, T_dictionary *d, char *error, int *db_fail);
 int db_susc_list(T_db *db, T_dictionary *d, MYSQL_RES **result, char *error, int *db_fail);
-int db_susc_show(T_db *db, T_dictionary *d, MYSQL_RES **result, char *error, int *db_fail);
+int db_susc_show(T_db *db, T_dictionary *d, char **data, char *error, int *db_fail);
 int db_susc_add(T_db *db, T_dictionary *d, char *error, int *db_fail);
 int db_susc_add_active(T_db *db, T_dictionary *d, char *error, int *db_fail);
 int db_susc_add_rollback(T_db *db, T_dictionary *d, char *error, int *db_fail);
