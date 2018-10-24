@@ -49,7 +49,7 @@ int db_susc_add_active(T_db *db, T_dictionary *d, char *error, int *db_fail);
 int db_susc_add_rollback(T_db *db, T_dictionary *d, char *error, int *db_fail);
 int db_susc_mod(T_db *db, T_dictionary *d, char *error, int *db_fail);
 int db_susc_exist(T_db *db, T_dictionary *d, char *error, int *db_fail);
-int db_susc_del(T_db *db, T_dictionary *d, char *error, int *db_fail);
+int db_susc_del(T_db *db, T_dictionary *d);
 
 /* SITIOS */
 int db_accept_add_site(T_db *db, T_dictionary *d, char *error, int *db_fail);

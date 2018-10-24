@@ -201,6 +201,7 @@ int task_susc_del(T_task *t, T_db *db, T_list_cloud *cl){
 
 	susc_id = dictionary_get(t->data,"susc_id");
 	if(t->status == T_TODO){
+		printf("PASOOOOO: %i\n",t->step);
 		if(t->step == 0){
 			/* Realizamos chequeos previos */
 			if(!db_susc_exist(db,t->data,error,&db_fail)){
@@ -230,7 +231,7 @@ int task_susc_del(T_task *t, T_db *db, T_list_cloud *cl){
 			}
 		} else if(t->step == 4){
 			/* Accionamos sobre el CORE */
-			if(!db_susc_del(db,t->data,result,&db_fail))
+			if(!db_susc_del(db,t->data))
 				task_done(t,result);
 			else
 				task_done(t,"{\"code\":\"212\",\"info\":\"Suscripcion eliminada\"}");
@@ -936,7 +937,7 @@ void task_run(T_task *t, T_db *db, T_list_cloud *cl){
 	T_cloud *c;
 	char *valor;
 	char error[200];
-	char plan_id[30];
+	//char plan_id[30];
 	int cloud_id;
 	int db_fail;
 
@@ -968,8 +969,8 @@ void task_run(T_task *t, T_db *db, T_list_cloud *cl){
 			if( t->type <= T_SITE_DEL){
 				/* Acciones sobre una nube web */
 				valor = dictionary_get(t->data,"susc_id");
-				strcpy(plan_id,"0");	//BUSCAR EL PLAN ID CORRESPONDIENTE AL SUSCRIPTION ID
-				if(! db_get_cloud_id(db,plan_id,C_WEB,&cloud_id,error,&db_fail)){
+				//strcpy(plan_id,"0");	//BUSCAR EL PLAN ID CORRESPONDIENTE AL SUSCRIPTION ID
+				if(! db_get_cloud_id(db,valor,C_WEB,&cloud_id,error,&db_fail)){
 					if(db_fail)
 						task_done(t,ERROR_FATAL);
 					else

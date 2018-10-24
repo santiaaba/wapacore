@@ -272,7 +272,7 @@ int db_user_del(T_db *db, T_dictionary *d, char *error, int *db_fail){
 	dictionary_init(&daux);
 	while(row = mysql_fetch_row(result)){
 		dictionary_add(&daux,"susc_id",row[0]);
-		if(!db_susc_del(db,&daux,error,&db_fail_aux)){
+		if(!db_susc_del(db,&daux)){
 			if(db_fail_aux){
 				/* Fallo la base de datos */
 				*db_fail=1;
@@ -559,41 +559,18 @@ int db_susc_mod(T_db *db, T_dictionary *d, char *error, int *db_fail){
 	return 1;
 }
 
-int db_susc_del(T_db *db, T_dictionary *d, char *error, int *db_fail){
-	/* Elimina una suscripcion de la base de datos.
- 	 * No verifica si la suscripcion existe o es del usuario correcto,
+int db_susc_del(T_db *db, T_dictionary *d){
+	/* Elimina una suscripcion de la base de datos. Retorna 1 si falla la base
+ 	 * de datos. No verifica si la suscripcion existe o es del usuario correcto,
  	 * es responsabilidad de la funcion llamadora */
 
 	char sql[200];
 
-	dictionary_print(d);
-
-	/* Eliminado suscripcion webhosting*/
-	sprintf(sql,"delete from web_suscription where id=%s",dictionary_get(d,"susc_id"));
-	if(0 != mysql_query(db->con,sql)){
-		*db_fail=1;
-		return 0;
-	}
-	/* Eliminado suscripcion mysqlDB*/
-	sprintf(sql,"delete from mysqldb_suscription where id=%s",dictionary_get(d,"susc_id"));
-	if(0 != mysql_query(db->con,sql)){
-		*db_fail=1;
-		return 0;
-	}
-	/* Eliminado suscripcion MSsqlDB*/
-	sprintf(sql,"delete from mssqldb_suscription where id=%s",dictionary_get(d,"susc_id"));
-	if(0 != mysql_query(db->con,sql)){
-		*db_fail=1;
-		return 0;
-	}
-
 	/* Eliminado suscripcion */
 	sprintf(sql,"delete from suscription where id=%s",dictionary_get(d,"susc_id"));
-	if(0 != mysql_query(db->con,sql)){
-		*db_fail=1;
+	printf("sql: %s\n",sql);
+	if(mysql_query(db->con,sql))
 		return 0;
-	}
-	*db_fail=0;
 	return 1;
 }
 
