@@ -106,17 +106,15 @@ int task_susc_add(T_task *t, T_db *db, T_list_cloud *cl){
 	printf("Task alta suscripcion\n");
 	if(t->status == T_TODO){
 		if(t->step == 0){
-			/* Accionamos sobre el CORE */
+			/* Creamos la suscripcion en la base de datos. Que da en estado "pendiente" */
 			if(!db_susc_add(db,t->data,error,&db_fail)){
 				if(db_fail)
 					task_done(t,ERROR_FATAL);
 				else
 					task_done(t,error);
 			}
-			printf("listo agregado suscripcion\n");
 		} else if(t->step > 0 && t->step < 4){
 			/* Accionamos sobre las nubes */
-			printf("Acciones sobre la nube. Paso: %i\n",t->step);
 			susc_id = dictionary_get(t->data,"susc_id");
 			switch (t->step){
 				case 1:	ok = db_get_cloud_id(db,susc_id,C_WEB,&cloud_id,error,&db_fail);
@@ -127,38 +125,25 @@ int task_susc_add(T_task *t, T_db *db, T_list_cloud *cl){
 					break;
 			}
 			if(ok){
-				printf("Nube encontrada\n");
+				/* La suscripcion utliza esta nube */
 				c = list_cloud_find_id(cl,cloud_id);
 				t->cloud = c;
 				sprintf(send_message,"0susc_id|%s", susc_id);
 				if(!task_cloud_send(t,send_message)){
 					printf("Nube no responde %i\n",t->step);
-					/* Cambiamos es estado de la suscripcion a borken */
-					/* Toda suscripcion en broken debe ser revisada */
-					if(!db_susc_broken(db,t->data,error,&db_fail)){
-						if(db_fail)
-							task_done(t,ERROR_FATAL);
-						else
-							task_done(t,error);
-					} else {
-						task_done(t,"{\"code\":\"300\",\"info\":\"Nube inaccesible\"}");
-					}
+					task_done(t,"{\"code\":\"300\",\"info\":\"Nube inaccesible. Suscripcion pendiente\"}");
 				}
-			}
+			} else 
+				if(db_fail)
+					task_done(t,ERROR_FATAL);
 		}
 		if(t->step == 4){
 			/* Hemos podido crear la suscripcion. Hemos podido crear la suscripcion en
- 			 * las distintas nubes. Posiblemente no todas. Se ser así entonces la
- 			 * suscripcion figura rota. Activamos definitivamente la suscripcion si
- 			 * no es así. */
-			if(!db_susc_add_active(db,t->data,error,&db_fail)){
-				if(db_fail)
-					task_done(t,ERROR_FATAL);
-				else
-					task_done(t,error);
-			} else {
+ 			 * las distintas nubes.Activamos definitivamente la suscripcion. */
+			if(!db_susc_add_active(db,t->data))
+				task_done(t,"{\"code\":\"300\",\"info\":\"Error Base de datos. Suscripcion pendiente\"}");
+			else
 				task_done(t,"{\"code\":\"211\",\"info\":\"Suscripcion agregada\"}");
-			}
 		}
 		t->step ++;	// dejo preparado para ejecutar el paso siguiente
 	} else if(t->status == T_WAITING){
@@ -209,7 +194,9 @@ int task_susc_del(T_task *t, T_db *db, T_list_cloud *cl){
 					task_done(t,ERROR_FATAL);
 				else
 					task_done(t,error);
-			}
+			} else
+				if(!db_susc_prepare(db,t->data,2))
+					task_done(t,ERROR_FATAL);
 		} else if(t->step > 0 && t->step < 4){
 			susc_id = dictionary_get(t->data,"susc_id");
 			switch (t->step){
@@ -225,14 +212,13 @@ int task_susc_del(T_task *t, T_db *db, T_list_cloud *cl){
 				t->cloud = c;
 				sprintf(send_message,"1susc_id|%s", susc_id);
 				task_cloud_send(t,send_message);
-			} else {
+			} else
 				if(db_fail)
 					task_done(t,ERROR_FATAL);
-			}
 		} else if(t->step == 4){
 			/* Accionamos sobre el CORE */
 			if(!db_susc_del(db,t->data))
-				task_done(t,result);
+				task_done(t,ERROR_FATAL);
 			else
 				task_done(t,"{\"code\":\"212\",\"info\":\"Suscripcion eliminada\"}");
 		}
@@ -385,7 +371,10 @@ void task_susc_stop(T_task *t, T_db *db, T_list_cloud *cl){
 					task_done(t,ERROR_FATAL);
 				else
 					task_done(t,error);
-			}
+			} else
+				if(!db_susc_prepare(db,t->data,3))
+					task_done(t,ERROR_FATAL);
+			
 		} else 	if(t->step > 0 && t->step < 4){
 			/* Accionamos sobre las nubes */
 			susc_id = dictionary_get(t->data,"susc_id");
@@ -446,7 +435,9 @@ void task_susc_start(T_task *t, T_db *db,T_list_cloud *cl){
 					task_done(t,ERROR_FATAL);
 				else
 					task_done(t,error);
-			}
+			} else 
+				if(!db_susc_prepare(db,t->data,3))
+					task_done(t,ERROR_FATAL);
 		} else if(t->step > 0 && t->step < 4){
 			/* Accionamos sobre las nubes */
 			strcpy(plan_id,"0");	//BUSCAR EL PLAN_ID CORRECTO EN BASE AL SUSCRIPTION_ID
@@ -567,8 +558,7 @@ int task_user_del(T_task *t, T_db *db, T_list_cloud *cl){
 
 	if(t->status == T_TODO){
 		/* Eliminamos sus suscripciones */
-		db_susc_list(db,t->data,&result,error,&db_fail);
-		if(!db_fail){
+		if(db_susc_list(db,t->data,&result,error,&db_fail)){
 			/* Eliminamos la primer suscripcion del listado */
 			result = mysql_store_result(db->con);
 			if(mysql_num_rows(result)> 0){
@@ -607,8 +597,7 @@ void task_user_stop(T_task *t, T_db *db, T_list_cloud *cl){
 
 	if(t->status == T_TODO){
 		/* Detenemos sus suscripciones */
-		db_susc_list(db,t->data,&result,error,&db_fail);
-		if(!db_fail){
+		if(db_susc_list(db,t->data,&result,error,&db_fail)){
 			/*Detenemos la primer suscripcion del listado */
 			result = mysql_store_result(db->con);
 			if(mysql_num_rows(result)> 0){
@@ -647,8 +636,7 @@ void task_user_start(T_task *t, T_db *db, T_list_cloud *cl){
 
 	if(t->status == T_TODO){
 		/* Detenemos sus suscripciones */
-		db_susc_list(db,t->data,&result,error,&db_fail);
-		if(!db_fail){
+		if(db_susc_list(db,t->data,&result,error,&db_fail)){
 			/*Iniciamos la primer suscripcion del listado */
 			result = mysql_store_result(db->con);
 			if(mysql_num_rows(result)> 0){

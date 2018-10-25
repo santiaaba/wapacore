@@ -138,6 +138,18 @@ int db_susc_exist(T_db *db, T_dictionary *d, char *error, int *db_fail){
 	}
 }
 
+int db_susc_prepare(T_db *db, T_dictionary *d, int action){
+	/* Prepara una suscripcion para ser modificada o eliminada.
+	   Retorna 0 si falla la base de datos */
+	char sql[100];
+
+	sprintf(sql,"update suscription set last_action = %i, status=2 where id = %s",
+                dictionary_get(d,"susc_id"));
+	if(mysql_query(db->con,sql))
+		return 0;
+	return 1;
+}
+
 void db_user_list(T_db *db, MYSQL_RES **result, int *db_fail){
 
 	mysql_query(db->con,"select id,name from user");
@@ -485,8 +497,8 @@ int db_susc_add(T_db *db, T_dictionary *d, char *error, int *db_fail){
 	}
 
 	printf("paso 6\n");
-	// Paso todos los chequeos. Lo damos de alta
-	sprintf(sql,"insert into suscription(user_id,plan_id,name) values(%s,%s,'%s')",
+	// Paso todos los chequeos. Lo damos de alta. Last_action = 1
+	sprintf(sql,"insert into suscription(user_id,plan_id,name,last_action) values(%s,%s,'%s',1)",
 	dictionary_get(d,"user_id"),dictionary_get(d,"plan_id"),plan_name);
 	if(mysql_query(db->con,sql)){
 		*db_fail=1;
@@ -502,16 +514,14 @@ int db_susc_add(T_db *db, T_dictionary *d, char *error, int *db_fail){
 	return 1;
 }
 
-int db_susc_add_active(T_db *db, T_dictionary *d, char *error, int *db_fail){
+int db_susc_add_active(T_db *db, T_dictionary *d){
 	/* Luego de la creacion de la suscripcion y de sus nubes... hay que activarla */
 
 	char sql[200];
 	sprintf(sql,"update suscription set status=1 where id=%s",dictionary_get(d,"susc_id"));
 	if(mysql_query(db->con,sql)){
-		*db_fail=1;
 		return 0;
 	}
-	*db_fail=0;
 	return 1;
 }
 
