@@ -22,6 +22,54 @@ int json_user_list(char **data, MYSQL_RES *result){
 		strcat(*data,"]");
 }
 
+int json_cloud_show(char **data, char *id, T_list_cloud *cl){
+
+	T_cloud *c;
+
+	c = list_cloud_find_id(cl,atoi(id));
+	printf("QUE paso con c: %p\n",c);
+	if(c){
+		*data = (char *) realloc(*data,200);
+		sprintf(*data,"{\"id\":%s,\"name\":\"%s\",\"type\":%i,\"status\":%i},",
+			id,cloud_get_name(c),cloud_get_type(c),cloud_get_status(c));
+		return 1;
+	} else {
+		/* No encontramos la nube. No deberia pasar */
+		return 0;
+	}
+}
+
+int json_cloud_list(char **data, MYSQL_RES *result, T_list_cloud *cl){
+	/* Lista las nubes existentes y el estado de cada una de ellas */
+	MYSQL_ROW row;
+	T_cloud *c;
+	int size=100;
+	int a=0;
+
+	*data = (char *) realloc(*data,size);
+	strcpy(*data,"{\"code\":\"200\",\"info\":[");
+	while ((row = mysql_fetch_row(result))){
+		a++;
+		if((strlen(*data)) + 100 > size){
+			size = size + 100;
+			*data = (char *) realloc(*data,size);
+		}
+		c = list_cloud_find_id(cl,atoi(row[0]));
+		if(c){
+			sprintf(*data,"%s{\"id\":%s,\"name\":\"%s\",\"type\":%s,\"status\":%i},",
+				*data,row[0],row[1],row[2],cloud_get_status(c));
+		} else {
+			/* No encontramos la nube. No deberia pasar */
+			return 0;
+		}
+	}
+	if(a)
+		(*data)[strlen(*data)-1] = ']';
+	else
+		strcat(*data,"]");
+	return 1;
+}
+
 int json_user_show(char **data, MYSQL_RES *result){
 
 	MYSQL_ROW row;

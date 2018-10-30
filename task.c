@@ -477,17 +477,16 @@ void task_susc_start(T_task *t, T_db *db,T_list_cloud *cl){
 	}
 }
 
+
 /*************	TASK USER  ***********************/
 
 void task_user_list(T_task *t, T_db *db){
 	/* Obtiene el listado de usuarios */
 	MYSQL_RES *db_r;
 	char *aux=NULL;
-	int db_fail;
 
 	logs_write(t->logs,L_DEBUG,"task_user_list","");
-	db_user_list(db,&db_r,&db_fail);
-	if(db_fail){
+	if(!db_user_list(db,&db_r)){
 		logs_write(t->logs,L_ERROR,"DB ERROR","");
 		task_done(t,ERROR_FATAL);
 	} else {
@@ -686,9 +685,42 @@ void task_json_result(T_task *t, char **result){
 
 /********************    TASK CLOUD   *****************************/
 
+void task_cloud_show(T_task *t, T_list_cloud *cl){
+	/* Retorna el estado de una nube en particular */
+	/* Los datos podemos tomarlos directamente de la estructura */
+
+	char *aux;
+
+	if(json_cloud_show(&aux,dictionary_get(t->data,"cloud_id"),cl)){
+		task_done(t,aux);
+		free(aux);
+	} else {
+		task_done(t,"{\"code\":\"200\",\"info\":\"Nube inexistente\"}");
+	}
+		
+}
+
+void task_cloud_list(T_task *t, T_db *db, T_list_cloud *cl){
+	/* Lista las nubes existentes con alguna informacion sobre ellas */
+
+	MYSQL_RES *db_r;
+	char *aux=NULL;
+
+	printf("ENTROOOOOOOOOOOOOOO\n");
+	logs_write(t->logs,L_DEBUG,"task_cloud_list","");
+	if(!db_cloud_list(db,&db_r)){
+		logs_write(t->logs,L_ERROR,"DB ERROR","");
+		task_done(t,ERROR_FATAL);
+	} else {
+		json_cloud_list(&aux,db_r,cl);
+		task_done(t,aux);
+	}
+	free(aux);
+}
+
 int task_cloud_send(T_task *t, char *send_message){
 	/* Envia una solicitud a la nube. Se guarda el task id en la estructura del task. */
-	/* Si no puede contactar a la nube retorna 0. Caso contrario retorna 1.
+	/* Si no puede contactar a la nube retorna 0. Caso contrario retorna 1. */
  	/* Cambia el estado del task a T_WAITING si pudo contactar a la nube. */
 
 	char *rcv_message = NULL;
@@ -919,6 +951,53 @@ void task_site_start(T_task *t, T_db *db){
 	}
 }
 
+void task_hw_server_list(T_task *t){
+	char send_message[200];
+
+	if(t->status == T_TODO){
+		sprintf(send_message,"L");
+		task_cloud_send(t,send_message);
+	} else if(t->status == T_WAITING){
+		task_cloud_get(t);
+	}
+}
+
+void task_hw_server_show(T_task *t){
+	char send_message[200];
+
+	if(t->status == T_TODO){
+		sprintf(send_message,"Sserver_id|%s",
+		dictionary_get(t->data,"server_id"));
+		task_cloud_send(t,send_message);
+	} else if(t->status == T_WAITING){
+		task_cloud_get(t);
+	}
+}
+
+void task_hw_server_stop(T_task *t){
+	char send_message[200];
+
+	if(t->status == T_TODO){
+		sprintf(send_message,"Kserver_id|%s",
+		dictionary_get(t->data,"server_id"));
+		task_cloud_send(t,send_message);
+	} else if(t->status == T_WAITING){
+		task_cloud_get(t);
+	}
+}
+
+void task_hw_server_start(T_task *t){
+	char send_message[200];
+
+	if(t->status == T_TODO){
+		sprintf(send_message,"Eserver_id|%s",
+		dictionary_get(t->data,"server_id"));
+		task_cloud_send(t,send_message);
+	} else if(t->status == T_WAITING){
+		task_cloud_get(t);
+	}
+}
+
 /***************************************************/
 
 void task_run(T_task *t, T_db *db, T_list_cloud *cl){
@@ -949,6 +1028,9 @@ void task_run(T_task *t, T_db *db, T_list_cloud *cl){
 			case T_SUSC_DEL: task_susc_del(t,db,cl); break;
 			case T_SUSC_STOP: task_susc_stop(t,db,cl); break;
 			case T_SUSC_START: task_susc_start(t,db,cl); break;
+
+			case T_CLOUD_LIST: task_cloud_list(t,db,cl); break;
+			case T_CLOUD_SHOW: task_cloud_show(t,cl); break;
 		}
 	} else {
 		/* Son acciones sobre alguna nube */
@@ -972,6 +1054,7 @@ void task_run(T_task *t, T_db *db, T_list_cloud *cl){
 		}
 		/* Una vez hubicada la nube... ejecutamos la tarea */
 		switch(t->type){
+
 			case T_SITE_LIST: task_site_list(t,db); break;
 			case T_SITE_SHOW: task_site_show(t,db); break;
 			case T_SITE_ADD: task_site_add(t,db); break;
@@ -979,6 +1062,11 @@ void task_run(T_task *t, T_db *db, T_list_cloud *cl){
 			case T_SITE_DEL: task_site_del(t,db); break;
 			case T_SITE_STOP: task_site_stop(t,db); break;
 			case T_SITE_START: task_site_start(t,db); break;
+
+			case T_HW_SERVER_LIST:task_hw_server_list(t); break;
+			case T_HW_SERVER_SHOW:task_hw_server_show(t); break;
+			case T_HW_SERVER_STOP:task_hw_server_stop(t); break;
+			case T_HW_SERVER_START:task_hw_server_start(t); break;
 		}
 	}
 }

@@ -20,6 +20,10 @@
 #define ERROR_CLOUD		"{\"code\":\"300\",\"info\":\"Nube inaccesible\"}"
 
 typedef enum {	
+	/* CLOUDS */
+	T_CLOUD_LIST,
+	T_CLOUD_SHOW,
+
 	/* PLAN */
 	T_PLAN_LIST,
 	T_PLAN_SHOW,
@@ -53,6 +57,14 @@ typedef enum {
 	T_SITE_DEL,
 	T_SITE_STOP,
 	T_SITE_START,
+
+	/* WEB INFRASTRUCTURE */
+	T_HW_SERVER_LIST,
+	T_HW_SERVER_SHOW,
+	T_HW_SERVER_ADD,
+	T_HW_SERVER_DEL,
+	T_HW_SERVER_STOP,
+	T_HW_SERVER_START
 
 } T_task_type;
 

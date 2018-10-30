@@ -11,7 +11,6 @@
  */
 
 void db_init(T_db *db, T_config *c, T_logs *logs){
-	db->con = mysql_init(NULL);
 	db->status = DB_ONLINE;
 	db->logs = logs;
 	strcpy(db->user,c->db_user);
@@ -21,6 +20,8 @@ void db_init(T_db *db, T_config *c, T_logs *logs){
 }
 
 int db_connect(T_db *db){
+	printf("Conectando a base de datos\n");
+	db->con = mysql_init(NULL);
 	if (mysql_real_connect(db->con, db->host,
 	     db->user, db->pass, db->dbname, 0, NULL, 0)) {
 		db->status = DB_ONLINE;
@@ -29,8 +30,24 @@ int db_connect(T_db *db){
 }
 
 void db_close(T_db *db){
+	printf("DESCONECTAMOS\n");
 	mysql_close(db->con);
 	db->status = DB_OFFLINE;
+}
+
+int db_live(T_db *db){
+
+	MYSQL_RES *result;
+
+	if(mysql_query(db->con,"select * from version")){
+		db_close(db);
+		return 0;
+	} else {
+		result = mysql_store_result(db->con);
+		return 1;
+	}
+	// Debemos liberar el resultado. Sino tira error 2014.
+	//mysql_free_result(db->con);
 }
 
 int db_load_clouds(T_db *db, T_list_cloud *clouds){
@@ -150,14 +167,24 @@ int db_susc_prepare(T_db *db, T_dictionary *d, int action){
 	return 1;
 }
 
-void db_user_list(T_db *db, MYSQL_RES **result, int *db_fail){
+int db_cloud_list(T_db *db, MYSQL_RES **result){
+
+	if(mysql_query(db->con,"select id,name,tipo from nube")){
+		printf("Fallo base de datos %i\n",mysql_errno(db->con));
+		return 0;
+	}
+	*result = mysql_store_result(db->con);
+	return 1;
+}
+
+int db_user_list(T_db *db, MYSQL_RES **result){
 
 	mysql_query(db->con,"select id,name from user");
 	if(mysql_errno(db->con)){
-		*db_fail = 1;
+		return 0;
 	}
 	*result = mysql_store_result(db->con);
-	*db_fail = 0;
+	return 1;
 }
 
 int db_user_show(T_db *db, T_dictionary *d, MYSQL_RES **result, char *error, int *db_fail){

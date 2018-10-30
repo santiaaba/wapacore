@@ -115,6 +115,14 @@ int check_data_site_add(T_dictionary *data, char *result){
 	return 1;
 }
 
+int check_cloud_show(T_dictionary *data, char *result){
+	if(!valid_id(dictionary_get(data,"cloud_id"))){
+		strcpy(result,"{\"task\":\"\",\"stauts\":\"ERROR\",\"data\":\"cloud_id invalido\"}");
+		return 0;
+	}
+	return 1;
+}
+
 void rest_server_add_task(T_rest_server *r, T_task *j){
 
 	pthread_mutex_lock(&(r->mutex_heap_task));
@@ -423,8 +431,58 @@ static int handle_GET(struct MHD_Connection *connection, const char *url){
 			task_init(task,&token,T_PLAN_LIST,NULL,&logs);
 		}
 
+	/* PARA LAS NUBES en general */
+	} else if(0 == strcmp("clouds",value)) {
+		parce_data((char *)url,'/',&pos,value);
+		if(strlen(value)>0){
+			data = malloc(sizeof(T_dictionary));
+			dictionary_init(data);
+			dictionary_add(data,"cloud_id",value);
+			parce_data((char *)url,'/',&pos,value);
+			if(strlen(value)>0){
+				// No deberiamos estar aqui. ERROR API
+				rest_server_url_error(result,&ok);
+			} else {
+				if(ok = check_cloud_show(data,result))
+					task_init(task,&token,T_CLOUD_SHOW,data,&logs);
+			}
+		} else {
+			/* Listado de nubes */
+			printf("Handle_GET listado nubes\n");
+			task_init(task,&token,T_CLOUD_LIST,NULL,&logs);
+		}
+
+	/* PARA LAS NUBES de webhosting */
+	} else if(0 == strcmp("webhosting",value)) {
+		parce_data((char *)url,'/',&pos,value);
+		if(strlen(value)>0){
+			data = malloc(sizeof(T_dictionary));
+			dictionary_init(data);
+			dictionary_add(data,"cloud_id",value);
+			parce_data((char *)url,'/',&pos,value);
+			if(0 == strcmp("servers",value)){
+				parce_data((char *)url,'/',&pos,value);
+				if(strlen(value)>0){
+					dictionary_add(data,"server_id",value);
+					parce_data((char *)url,'/',&pos,value);
+					if(0 == strcmp("stop",value)){
+						task_init(task,&token,T_HW_SERVER_STOP,data,&logs);
+					} else if(0 == strcmp("start",value)){
+						task_init(task,&token,T_HW_SERVER_START,data,&logs);
+					} else {
+						task_init(task,&token,T_HW_SERVER_SHOW,data,&logs);
+					}
+				} else {
+					task_init(task,&token,T_HW_SERVER_LIST,data,&logs);
+				}
+			} else {
+				rest_server_url_error(result,&ok);
+			}
+		} else {
+			rest_server_url_error(result,&ok);
+		}
+
 	/* PARA LOS USUARIOS */
-	printf("Handle_GET usuarios\n");
 	} else if(0 == strcmp("users",value)) {
 		parce_data((char *)url,'/',&pos,value);
 		if(strlen(value)>0){

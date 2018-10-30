@@ -21,6 +21,16 @@ void check_clouds(T_list_cloud *clouds){
 	}
 }
 
+void check_db(T_db *db){
+	// Verifica el estado de la conexion a la base de datos
+	printf("Chequeamos base\n");
+	if(!db_live(db)){
+		printf("DB NO CONNECT!!!!");
+		db_connect(db);
+	}
+	printf("Termina chequeo DB\n");
+}
+
 /********************************
  *      Variables GLOBALES      *
  ********************************/
@@ -62,8 +72,8 @@ void main(){
 	rest_server_init(&rest_server,&db,&clouds);
 
 	while(1){
-		//check_clouds(&clouds);
-		//check db_connection
+		check_clouds(&clouds);
+		check_db(&db);
 		sleep(5);
 	}
 }

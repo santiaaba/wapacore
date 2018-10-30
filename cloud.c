@@ -78,6 +78,10 @@ T_cloud_type cloud_get_type(T_cloud *c){
 	return c->type;
 }
 
+T_cloud_status cloud_get_status(T_cloud *c){
+	return c->status;
+}
+
 int cloud_check(T_cloud *c){
 	char *rcv_message = NULL;
 	uint32_t rcv_message_size = 0;

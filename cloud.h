@@ -43,6 +43,7 @@ char *cloud_get_ipv4(T_cloud *c);
 char *cloud_get_user(T_cloud *c);
 char *cloud_get_pass(T_cloud *c);
 T_cloud_type cloud_get_type(T_cloud *c);
+T_cloud_status cloud_get_status(T_cloud *c);
 int cloud_connect(T_cloud *c);
 int cloud_check(T_cloud *c);
 int cloud_end_connect(T_cloud *c);
