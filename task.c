@@ -85,6 +85,14 @@ char *tob_get_id(T_task *t){
 	return t->id;
 }
 
+int task_assign_cloud(T_task *t, T_list_cloud *cl){
+	/* Cuando son acciones directas sobre una nube, el task
+ 	 * deberia tener un dato en el diccionario llamado cloud_id.
+ 	 * Con el cloud_id debe buscar la nube en la lista y asignarsela */
+	t->cloud = list_cloud_find_id(cl,atoi(dictionary_get(t->data,"cloud_id")));
+	return (t->cloud != NULL);
+}
+
 /*************	TASK SUSCRIPT  ***********************/
 
 int task_susc_add(T_task *t, T_db *db, T_list_cloud *cl){
@@ -951,10 +959,11 @@ void task_site_start(T_task *t, T_db *db){
 	}
 }
 
-void task_hw_server_list(T_task *t){
+void task_hw_server_list(T_task *t, T_list_cloud *cl){
 	char send_message[200];
 
 	if(t->status == T_TODO){
+		task_assign_cloud(t,cl);
 		sprintf(send_message,"L");
 		task_cloud_send(t,send_message);
 	} else if(t->status == T_WAITING){
@@ -962,10 +971,11 @@ void task_hw_server_list(T_task *t){
 	}
 }
 
-void task_hw_server_show(T_task *t){
+void task_hw_server_show(T_task *t, T_list_cloud *cl){
 	char send_message[200];
 
 	if(t->status == T_TODO){
+		task_assign_cloud(t,cl);
 		sprintf(send_message,"Sserver_id|%s",
 		dictionary_get(t->data,"server_id"));
 		task_cloud_send(t,send_message);
@@ -974,10 +984,11 @@ void task_hw_server_show(T_task *t){
 	}
 }
 
-void task_hw_server_stop(T_task *t){
+void task_hw_server_stop(T_task *t, T_list_cloud *cl){
 	char send_message[200];
 
 	if(t->status == T_TODO){
+		task_assign_cloud(t,cl);
 		sprintf(send_message,"Kserver_id|%s",
 		dictionary_get(t->data,"server_id"));
 		task_cloud_send(t,send_message);
@@ -986,10 +997,11 @@ void task_hw_server_stop(T_task *t){
 	}
 }
 
-void task_hw_server_start(T_task *t){
+void task_hw_server_start(T_task *t, T_list_cloud *cl){
 	char send_message[200];
 
 	if(t->status == T_TODO){
+		task_assign_cloud(t,cl);
 		sprintf(send_message,"Eserver_id|%s",
 		dictionary_get(t->data,"server_id"));
 		task_cloud_send(t,send_message);
@@ -1012,25 +1024,25 @@ void task_run(T_task *t, T_db *db, T_list_cloud *cl){
 		/* No son acciones sobre una nube */
 		switch(t->type){
 			/* USERS */
-			case T_USER_LIST: task_user_list(t,db); break;
-			case T_USER_SHOW: task_user_show(t,db); break;
-			case T_USER_ADD: task_user_add(t,db); break;
-			case T_USER_MOD: task_user_mod(t,db); break;
-			case T_USER_DEL: task_user_del(t,db,cl); break;
-			case T_USER_STOP: task_user_stop(t,db,cl); break;
-			case T_USER_START: task_user_start(t,db,cl); break;
+			case T_USER_LIST:	task_user_list(t,db); break;
+			case T_USER_SHOW:	task_user_show(t,db); break;
+			case T_USER_ADD:	task_user_add(t,db); break;
+			case T_USER_MOD:	task_user_mod(t,db); break;
+			case T_USER_DEL:	task_user_del(t,db,cl); break;
+			case T_USER_STOP:	task_user_stop(t,db,cl); break;
+			case T_USER_START:	task_user_start(t,db,cl); break;
 	
 			/* SUSCRIPTION */
-			case T_SUSC_LIST: task_susc_list(t,db); break;
-			case T_SUSC_SHOW: task_susc_show(t,db,cl); break;
-			case T_SUSC_ADD: task_susc_add(t,db,cl); break;
-			case T_SUSC_MOD: task_susc_mod(t,db); break;
-			case T_SUSC_DEL: task_susc_del(t,db,cl); break;
-			case T_SUSC_STOP: task_susc_stop(t,db,cl); break;
-			case T_SUSC_START: task_susc_start(t,db,cl); break;
+			case T_SUSC_LIST:	task_susc_list(t,db); break;
+			case T_SUSC_SHOW:	task_susc_show(t,db,cl); break;
+			case T_SUSC_ADD:	task_susc_add(t,db,cl); break;
+			case T_SUSC_MOD:	task_susc_mod(t,db); break;
+			case T_SUSC_DEL:	task_susc_del(t,db,cl); break;
+			case T_SUSC_STOP:	task_susc_stop(t,db,cl); break;
+			case T_SUSC_START:	task_susc_start(t,db,cl); break;
 
-			case T_CLOUD_LIST: task_cloud_list(t,db,cl); break;
-			case T_CLOUD_SHOW: task_cloud_show(t,cl); break;
+			case T_CLOUD_LIST:	task_cloud_list(t,db,cl); break;
+			case T_CLOUD_SHOW:	task_cloud_show(t,cl); break;
 		}
 	} else {
 		/* Son acciones sobre alguna nube */
@@ -1063,10 +1075,10 @@ void task_run(T_task *t, T_db *db, T_list_cloud *cl){
 			case T_SITE_STOP: task_site_stop(t,db); break;
 			case T_SITE_START: task_site_start(t,db); break;
 
-			case T_HW_SERVER_LIST:task_hw_server_list(t); break;
-			case T_HW_SERVER_SHOW:task_hw_server_show(t); break;
-			case T_HW_SERVER_STOP:task_hw_server_stop(t); break;
-			case T_HW_SERVER_START:task_hw_server_start(t); break;
+			case T_HW_SERVER_LIST:task_hw_server_list(t,cl); break;
+			case T_HW_SERVER_SHOW:task_hw_server_show(t,cl); break;
+			case T_HW_SERVER_STOP:task_hw_server_stop(t,cl); break;
+			case T_HW_SERVER_START:task_hw_server_start(t,cl); break;
 		}
 	}
 }

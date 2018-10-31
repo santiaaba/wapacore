@@ -72,7 +72,7 @@ void main(){
 	rest_server_init(&rest_server,&db,&clouds);
 
 	while(1){
-		check_clouds(&clouds);
+		//check_clouds(&clouds);
 		check_db(&db);
 		sleep(5);
 	}

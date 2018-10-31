@@ -130,7 +130,7 @@ int cloud_send_receive(T_cloud *cloud, char *send_message, uint32_t send_message
 	}
 
 	printf("SEND-------SEND----SEND-----\n");
-	printf("Mensaje a la Nube. BUFFER_SIZE=%i , send_message_size=:%i, send_message=%s\n",BUFFER_SIZE,send_message_size,send_message);
+	printf("Mensaje a la Nube. send_message_size=:%i, send_message=%s\n",send_message_size,send_message);
 	/* Los 4 primeros bytes del header es el tamano total del mensaje */
 	int_to_4bytes(&send_message_size,buffer);
 
@@ -146,7 +146,9 @@ int cloud_send_receive(T_cloud *cloud, char *send_message, uint32_t send_message
 		int_to_4bytes(&parce_size,&(buffer[4]));
 		memcpy(buffer + HEADER_SIZE,send_message + c,parce_size);
 		c += parce_size;
+		printf("Listos para enviar %i\n",cloud->socket);
 		if(send(cloud->socket,buffer,BUFFER_SIZE,0)<0){
+			printf("Socket no responde\n");
 			cloud_change_status(cloud,C_UNKNOWN);
 			cloud_connect(cloud);
 			return 0;
