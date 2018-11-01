@@ -360,12 +360,16 @@ static int handle_DELETE(struct MHD_Connection *connection, const char *url){
 					if(strlen(value)>0){
 						dictionary_add(data,"susc_id",value);
 						parce_data((char *)url,'/',&pos,value);
-						if(0 == strcmp("sites",value)) {
-							parce_data((char *)url,'/',&pos,value);
-							if(strlen(value)>0) {
-								/* BORRADO SITIO */
-								dictionary_add(data,"site_id",value);
-								task_init(task,&token,T_SITE_DEL,data,&logs);
+						if(strlen(value)>0){
+							if(0 == strcmp("sites",value)) {
+								parce_data((char *)url,'/',&pos,value);
+								if(strlen(value)>0) {
+									/* BORRADO SITIO */
+									dictionary_add(data,"site_id",value);
+									task_init(task,&token,T_SITE_DEL,data,&logs);
+								} else {
+									rest_server_url_error(result,&ok);
+								}
 							} else {
 								rest_server_url_error(result,&ok);
 							}
