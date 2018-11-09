@@ -88,6 +88,7 @@ char *dictionary_get(T_dictionary *d, char *key){
 void dictionary_destroy(T_dictionary **d){
 	dictionary_node *aux;
 	
+	printf("Dictianary %p\n",(*d)->first);
 	while((*d)->first!=NULL){
 		aux = (*d)->first;
 		free(aux->key);

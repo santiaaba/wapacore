@@ -25,12 +25,12 @@ void random_token(T_tasktoken value){
 /*****************************
 	     TASK 
 ******************************/
-void task_init(T_task *t, T_tasktoken *token, T_task_type type, T_dictionary *data, T_logs *logs){
+void task_init(T_task *t, T_tasktoken *token, T_dictionary *data, T_logs *logs){
 	printf("dictionary:");
 	dictionary_print(data);
 	random_task_id(t->id);
 	t->token = token;
-	t->type = type;
+	t->type = T_NONE;
 	t->logs = logs;
 	t->data = data;
 	t->step=0;
@@ -39,6 +39,10 @@ void task_init(T_task *t, T_tasktoken *token, T_task_type type, T_dictionary *da
 	t->result_code = 0;
 	t->cloud = NULL;
 	strcpy(t->result,"");
+}
+
+void task_set_type(T_task *t, T_task_type type){
+	t->type = type;
 }
 
 char *task_get_id(T_task *t){
@@ -50,6 +54,7 @@ void task_destroy(T_task **t){
 	if((*t)->data != NULL){
 		printf("Destruimos el diccionario\n");
 		dictionary_destroy(&((*t)->data));
+		printf("Fin Destruimos el diccionario\n");
 	}
 	free((*t)->result);
 	free(*t);
@@ -61,6 +66,10 @@ T_task_status task_get_status(T_task *t){
 
 T_tasktoken *task_get_token(T_task *t){
 	return t->token;
+}
+
+T_dictionary *task_get_data(T_task *t){
+	return t->data;
 }
 
 void task_print_status(T_task *t, char *s){

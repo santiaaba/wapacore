@@ -237,19 +237,20 @@ static int handle_POST(struct MHD_Connection *connection,
 	   eliminar la estructura de diccionario. Sino que pasa
 	   a ser responsabilidad del task. */
 
-	task = (T_task *)malloc(sizeof(T_task));
 	parce_data((char *)url,'/',&pos,value);
+	task = (T_task *)malloc(sizeof(T_task));
+	task_init(task,&token,con_info->data,&logs);
 
 	/* PARA LOS PLANES */
 	if(0 == strcmp("plans",value)){
 		parce_data((char *)url,'/',&pos,value);
 		if(strlen(value)>0){
 			ok=0;
-		
 			rest_server_url_error(result,&ok);
 		} else {
-			if(ok = check_data_plan_add(con_info->data,result))
-				task_init(task,&token,T_PLAN_ADD, con_info->data,&logs);
+			if(ok = check_data_plan_add(con_info->data,result)){
+				task_set_type(task,T_PLAN_ADD);
+			}
 		}
 	/* PARA LOS USUARIOS */
 	printf("Handle_POST usuarios\n");
@@ -273,23 +274,23 @@ static int handle_POST(struct MHD_Connection *connection,
 								dictionary_add(con_info->data,"site_id",value);
 								/* EDICION SITIO */
 								if(ok = check_data_site_mod(con_info->data,result))
-									task_init(task,&token,T_SITE_MOD,con_info->data,&logs);
+									task_set_type(task,T_SITE_MOD);
 							} else {
 								/* ALTA SITIO */
 								if(ok = check_data_site_add(con_info->data,result))
-									task_init(task,&token,T_SITE_ADD,con_info->data,&logs);
+									task_set_type(task,T_SITE_ADD);
 							}
 						} else {
 							/* EDICION SUSCRIPCIONES */
 							dictionary_add(con_info->data,"susc_id",value);
 							if(ok = check_data_susc_mod(con_info->data,result))
-								task_init(task,&token,T_SUSC_MOD,con_info->data,&logs);
+								task_set_type(task,T_SUSC_MOD);
 						}
 					} else {
 						/* ALTA SUSCRIPCIONES */
 						printf("Handle_POST alta suscripcion\n");
 						if(ok = check_data_susc_add(con_info->data,result))
-							task_init(task,&token,T_SUSC_ADD,con_info->data,&logs);
+							task_set_type(task,T_SUSC_ADD);
 					}
 				} else {
 					rest_server_url_error(result,&ok);
@@ -297,12 +298,12 @@ static int handle_POST(struct MHD_Connection *connection,
 			} else {
 				/* EDICION DE USUARIO */
 				if(ok = check_data_user_mod(con_info->data,result))
-					task_init(task,&token,T_USER_MOD,con_info->data,&logs);
+					task_set_type(task,T_USER_MOD);
 			}
 		} else {
 			/* ALTA DE USUARIO */
 			if(ok = check_data_user_add(con_info->data,result))
-				task_init(task,&token,T_USER_ADD,con_info->data,&logs);
+				task_set_type(task,T_USER_ADD);
 		}
 	/* CUALQUIER OTRA COSA. ERROR */
 	} else {
@@ -314,7 +315,9 @@ static int handle_POST(struct MHD_Connection *connection,
 	if(ok){
 		rest_server_add_task(&rest_server,task);
 		sprintf(result,"{\"task\":\"%s\",\"status\":\"TODO\"}",task_get_id(task));
-	}
+	} else
+		task_destroy(&task);
+	
 	send_page (connection,result);
 	return ok;
 }
@@ -327,15 +330,19 @@ static int handle_DELETE(struct MHD_Connection *connection, const char *url){
 	T_dictionary *data;
 	char *result = (char *)malloc(TASKRESULT_SIZE);
 	unsigned int size_result = TASKRESULT_SIZE;
-	T_task *task;
+	T_task *task=NULL;
 	T_taskid *taskid;
 
-	task = (T_task *)malloc(sizeof(T_task));
 
 	/* El token de momento lo inventamos
 	 * pero deberia venir en el header del mensaje */
 	T_tasktoken token;
 	random_token(token);
+
+	data = malloc(sizeof(T_dictionary));
+	dictionary_init(data);
+	task = (T_task *)malloc(sizeof(T_task));
+	task_init(task,&token,data,&logs);
 
 	/* PARA LOS PLANES */
 	parce_data((char *)url,'/',&pos,value);
@@ -343,30 +350,28 @@ static int handle_DELETE(struct MHD_Connection *connection, const char *url){
 		parce_data((char *)url,'/',&pos,value);
 		if(strlen(value)> 0){
 			/* BORRAR PLAN */
-			task_init(task,&token,T_PLAN_DEL,data,&logs);
+			task_set_type(task,T_PLAN_DEL);
 		} else {
 			rest_server_url_error(result,&ok);
 		}
 	} else if(0 == strcmp("users",value)){
 		parce_data((char *)url,'/',&pos,value);
 		if(strlen(value)> 0){
-			data = malloc(sizeof(T_dictionary));
-			dictionary_init(data);
-			dictionary_add(data,"user_id",value);
+			dictionary_add(task_get_data(task),"user_id",value);
 			parce_data((char *)url,'/',&pos,value);
 			if(strlen(value)>0){
 				if(0 == strcmp("susc",value)) {
 					parce_data((char *)url,'/',&pos,value);
 					if(strlen(value)>0){
-						dictionary_add(data,"susc_id",value);
+						dictionary_add(task_get_data(task),"susc_id",value);
 						parce_data((char *)url,'/',&pos,value);
 						if(strlen(value)>0){
 							if(0 == strcmp("sites",value)) {
 								parce_data((char *)url,'/',&pos,value);
 								if(strlen(value)>0) {
 									/* BORRADO SITIO */
-									dictionary_add(data,"site_id",value);
-									task_init(task,&token,T_SITE_DEL,data,&logs);
+									dictionary_add(task_get_data(task),"site_id",value);
+									task_set_type(task,T_SITE_DEL);
 								} else {
 									rest_server_url_error(result,&ok);
 								}
@@ -375,7 +380,7 @@ static int handle_DELETE(struct MHD_Connection *connection, const char *url){
 							}
 						} else {
 							/* BORRADO SUSCRIPCION */
-							task_init(task,&token,T_SUSC_DEL,data,&logs);
+							task_set_type(task,T_SUSC_DEL);
 						}
 					} else {
 						rest_server_url_error(result,&ok);
@@ -385,7 +390,7 @@ static int handle_DELETE(struct MHD_Connection *connection, const char *url){
 				}
 			} else {
 				/* BORRAR USUARIO */
-				task_init(task,&token,T_USER_DEL,data,&logs);
+				task_set_type(task,T_USER_DEL);
 			}
 		} else {
 			rest_server_url_error(result,&ok);
@@ -408,7 +413,7 @@ static int handle_GET(struct MHD_Connection *connection, const char *url){
 	T_dictionary *data;
 	char *result = (char *)malloc(TASKRESULT_SIZE);
 	unsigned int size_result = TASKRESULT_SIZE;
-	T_task *task;
+	T_task *task = NULL;
 	T_taskid *taskid;
 	int ok=1;	// Resultado a retornar la funcion
 	int isTaskStatus =0;	// Cualquier GET excepto el que solisita el estadod e un task se encola.
@@ -420,49 +425,47 @@ static int handle_GET(struct MHD_Connection *connection, const char *url){
 	T_tasktoken token;
 	random_token(token);
 
+	data = malloc(sizeof(T_dictionary));
+	dictionary_init(data);
 	task = (T_task *)malloc(sizeof(T_task));
+	task_init(task,&token,data,&logs);
+
 
 	parce_data((char *)url,'/',&pos,value);
 	/* PARA LOS PLANES */
 	if(0 == strcmp("plans",value)){
 		parce_data((char *)url,'/',&pos,value);
 		if(strlen(value)> 0){
-			data = malloc(sizeof(T_dictionary));
-			dictionary_init(data);
-			dictionary_add(data,"id",value);
-			task_init(task,&token,T_PLAN_SHOW,data,&logs);
+			dictionary_add(task_get_data(task),"id",value);
+			task_set_type(task,T_PLAN_SHOW);
 		} else {
-			task_init(task,&token,T_PLAN_LIST,NULL,&logs);
+			task_set_type(task,T_PLAN_LIST);
 		}
 
 	/* PARA LAS NUBES en general */
 	} else if(0 == strcmp("clouds",value)) {
 		parce_data((char *)url,'/',&pos,value);
 		if(strlen(value)>0){
-			data = malloc(sizeof(T_dictionary));
-			dictionary_init(data);
-			dictionary_add(data,"cloud_id",value);
+			dictionary_add(task_get_data(task),"cloud_id",value);
 			parce_data((char *)url,'/',&pos,value);
 			if(strlen(value)>0){
 				// No deberiamos estar aqui. ERROR API
 				rest_server_url_error(result,&ok);
 			} else {
 				if(ok = check_cloud_show(data,result))
-					task_init(task,&token,T_CLOUD_SHOW,data,&logs);
+					task_set_type(task,T_CLOUD_SHOW);
 			}
 		} else {
 			/* Listado de nubes */
 			printf("Handle_GET listado nubes\n");
-			task_init(task,&token,T_CLOUD_LIST,NULL,&logs);
+			task_set_type(task,T_CLOUD_LIST);
 		}
 
 	/* PARA LAS NUBES de webhosting */
 	} else if(0 == strcmp("webhosting",value)) {
 		parce_data((char *)url,'/',&pos,value);
 		if(strlen(value)>0){
-			data = malloc(sizeof(T_dictionary));
-			dictionary_init(data);
-			dictionary_add(data,"cloud_id",value);
+			dictionary_add(task_get_data(task),"cloud_id",value);
 			parce_data((char *)url,'/',&pos,value);
 			if(0 == strcmp("servers",value)){
 				parce_data((char *)url,'/',&pos,value);
@@ -470,14 +473,14 @@ static int handle_GET(struct MHD_Connection *connection, const char *url){
 					dictionary_add(data,"server_id",value);
 					parce_data((char *)url,'/',&pos,value);
 					if(0 == strcmp("stop",value)){
-						task_init(task,&token,T_HW_SERVER_STOP,data,&logs);
+						task_set_type(task,T_HW_SERVER_STOP);
 					} else if(0 == strcmp("start",value)){
-						task_init(task,&token,T_HW_SERVER_START,data,&logs);
+						task_set_type(task,T_HW_SERVER_START);
 					} else {
-						task_init(task,&token,T_HW_SERVER_SHOW,data,&logs);
+						task_set_type(task,T_HW_SERVER_SHOW);
 					}
 				} else {
-					task_init(task,&token,T_HW_SERVER_LIST,data,&logs);
+					task_set_type(task,T_HW_SERVER_LIST);
 				}
 			} else {
 				rest_server_url_error(result,&ok);
@@ -490,9 +493,7 @@ static int handle_GET(struct MHD_Connection *connection, const char *url){
 	} else if(0 == strcmp("users",value)) {
 		parce_data((char *)url,'/',&pos,value);
 		if(strlen(value)>0){
-			data = malloc(sizeof(T_dictionary));
-			dictionary_init(data);
-			dictionary_add(data,"user_id",value);
+			dictionary_add(task_get_data(task),"user_id",value);
 			parce_data((char *)url,'/',&pos,value);
 			if(strlen(value)>0){
 				/* PARA LAS SUSCRIPCIONES DEL USUARIO */
@@ -500,7 +501,7 @@ static int handle_GET(struct MHD_Connection *connection, const char *url){
 				if(0 == strcmp("susc",value)) {
 					parce_data((char *)url,'/',&pos,value);
 					if(strlen(value)>0){
-						dictionary_add(data,"susc_id",value);
+						dictionary_add(task_get_data(task),"susc_id",value);
 						parce_data((char *)url,'/',&pos,value);
 						if(strlen(value)>0){
 							if(0 == strcmp("sites",value)){
@@ -508,13 +509,13 @@ static int handle_GET(struct MHD_Connection *connection, const char *url){
 								if(strlen(value)>0){
 									printf("Handle_GET sitios web\n");
 									/* Show site */
-									dictionary_add(data,"site_id",value);
+									dictionary_add(task_get_data(task),"site_id",value);
 									if(ok = check_site_show(data,result))
-										task_init(task,&token,T_SITE_SHOW,data,&logs);
+										task_set_type(task,T_SITE_SHOW);
 								} else {
 									/* Listado de sitios */
 									if(ok = check_site_list(data,result))
-										task_init(task,&token,T_SITE_LIST,data,&logs);
+										task_set_type(task,T_SITE_LIST);
 								}
 							} else {
 								rest_server_url_error(result,&ok);
@@ -522,11 +523,11 @@ static int handle_GET(struct MHD_Connection *connection, const char *url){
 						} else {
 							/* Informacion de una suscripcion */
 							if(ok = (check_susc_show(data,result)))
-								task_init(task,&token,T_SUSC_SHOW,data,&logs);
+								task_set_type(task,T_SUSC_SHOW);
 						}
 					} else {
 						/* Listado suscripciones de un usuario*/
-						task_init(task,&token,T_SUSC_LIST,data,&logs);
+						task_set_type(task,T_SUSC_LIST);
 					}
 				} else {
 					rest_server_url_error(result,&ok);
@@ -534,12 +535,12 @@ static int handle_GET(struct MHD_Connection *connection, const char *url){
 			} else {
 				/* Informacion sobre un usuario */
 				if(ok = check_user_show(data,result))
-					task_init(task,&token,T_USER_SHOW,data,&logs);
+					task_set_type(task,T_USER_SHOW);
 			}
 		} else {
 			/* Listado de usuarios */
 			printf("Handle_GET listado usuarios\n");
-			task_init(task,&token,T_USER_LIST,NULL,&logs);
+			task_set_type(task,T_USER_LIST);
 		}
 
 	/* PARA LOS TASK */
@@ -565,9 +566,8 @@ static int handle_GET(struct MHD_Connection *connection, const char *url){
 			sprintf(result,"{'task':'%s','status':'TODO'}",task_get_id(task));
 			rest_server_add_task(&rest_server,task);
 		}
-	} else {
+	} else 
 		task_destroy(&task);
-	}
 	send_page (connection, result);
 	return ok;
 }

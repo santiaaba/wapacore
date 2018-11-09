@@ -20,6 +20,7 @@
 #define ERROR_CLOUD		"{\"code\":\"300\",\"info\":\"Nube inaccesible\"}"
 
 typedef enum {	
+	T_NONE,
 	/* CLOUDS */
 	T_CLOUD_LIST,
 	T_CLOUD_SHOW,
@@ -112,8 +113,10 @@ typedef struct {
 	char *result;			//resultado en formato json para retornar.
 } T_task;
 
-void task_init(T_task *t, T_tasktoken *token, T_task_type type, T_dictionary *data, T_logs *logs);
+void task_init(T_task *t, T_tasktoken *token, T_dictionary *data, T_logs *logs);
+void task_set_type(T_task *t, T_task_type type);
 void task_destroy(T_task **t);
+T_dictionary *task_get_data(T_task *t);
 void task_run(T_task *t, T_db *db, T_list_cloud *cl);
 T_tasktoken *task_get_token(T_task *t);
 void task_done(T_task *t, char *message);

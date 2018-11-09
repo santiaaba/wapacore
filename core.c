@@ -73,7 +73,7 @@ void main(){
 
 	while(1){
 		//check_clouds(&clouds);
-		check_db(&db);
+		//check_db(&db);
 		sleep(5);
 	}
 }
