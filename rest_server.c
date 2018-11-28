@@ -42,14 +42,8 @@ int check_site_show(T_dictionary *data, char *result){
 }
 
 int check_site_list(T_dictionary *data, char *result){
-	if(!valid_id(dictionary_get(data,"susc_id"))){
-                strcpy(result,"{\"task\":\"\",\"stauts\":\"ERROR\",\"data\":\"Id suscripcion invalido\"}");
-                return 0;
-        }
-	if(!valid_id(dictionary_get(data,"user_id"))){
-                strcpy(result,"{\"task\":\"\",\"stauts\":\"ERROR\",\"data\":\"Id usuario invalido\"}");
-                return 0;
-        }
+	CHECK_REST_ID(susc_id,suscripcion)
+	CHECK_REST_ID(susc_id,usuario)
 	return 1;
 }
 
@@ -76,6 +70,7 @@ int check_data_user_mod(T_dictionary *data, char *result){
 	/* Verifica que los parametros esten todos y que
  	 * tengan un formato correcto. En *result retorna
  	 * el error en formato json de ser necesario */
+	CHECK_REST_ID(user_id,usuario)
 	if(!valid_user_name(dictionary_get(data,"name"))){
 		strcpy(result,"{\"task\":\"\",\"stauts\":\"ERROR\",\"data\":\"Nombre usuario invalido\"}");
 		return 0;
@@ -92,36 +87,50 @@ int check_data_user_mod(T_dictionary *data, char *result){
 }
 
 int check_data_susc_add(T_dictionary *data, char *result){
-	/* Verifica que los parametros esten todos y que
- 	 * tengan un formato correcto. En *result retorna
- 	 * el error en formato json de ser necesario */
-	printf("Validando informacion alta de sitio");
-	if(!valid_id(dictionary_get(data,"plan_id"))){
-		strcpy(result,"{\"task\":\"\",\"stauts\":\"ERROR\",\"data\":\"plan_id invalido\"}");
-		return 0;
-	}
+	CHECK_REST_ID(plan_id,plan)
 	return 1;
 }
 
 int check_data_susc_mod(T_dictionary *data, char *result){
+	CHECK_REST_ID(susc_id,suscripcion)
 	return 1;
 }
 
 int check_data_site_mod(T_dictionary *data, char *result){
+	CHECK_REST_ID(susc_id,suscripcion)
+	CHECK_REST_ID(site_id,sitio)
 	return 1;
 }
 
 int check_data_site_add(T_dictionary *data, char *result){
+	CHECK_REST_ID(susc_id,suscripcion)
 	return 1;
 }
 
 int check_cloud_show(T_dictionary *data, char *result){
-	if(!valid_id(dictionary_get(data,"cloud_id"))){
-		strcpy(result,"{\"task\":\"\",\"stauts\":\"ERROR\",\"data\":\"cloud_id invalido\"}");
-		return 0;
-	}
+	CHECK_REST_ID(susc_id,nube)
 	return 1;
 }
+
+int check_data_ftp_list(T_dictionary *data, char *result){
+	CHECK_REST_ID(susc_id,suscripcion)
+	CHECK_REST_ID(site_id,sitio)
+	return 1;
+}
+
+int check_data_ftp_add(T_dictionary *data, char *result){
+	CHECK_REST_ID(susc_id,suscripcion)
+	CHECK_REST_ID(site_id,sitio)
+	return 1;
+}
+
+int check_data_ftp_mod(T_dictionary *data, char *result){
+	CHECK_REST_ID(susc_id,suscripcion)
+	CHECK_REST_ID(site_id,sitio)
+	CHECK_REST_ID(ftp_id,usuario ftp)
+	return 1;
+}
+
 
 void rest_server_add_task(T_rest_server *r, T_task *j){
 
@@ -272,9 +281,28 @@ static int handle_POST(struct MHD_Connection *connection,
 							parce_data((char *)url,'/',&pos,value);
 							if(strlen(value)>0){
 								dictionary_add(con_info->data,"site_id",value);
-								/* EDICION SITIO */
-								if(ok = check_data_site_mod(con_info->data,result))
-									task_set_type(task,T_SITE_MOD);
+								parce_data((char *)url,'/',&pos,value);
+								if(strlen(value)>0){
+									if(0 == strcmp("ftp_users",value)){
+										parce_data((char *)url,'/',&pos,value);
+										if(strlen(value)>0){
+											/* EDICION FTP */
+											dictionary_add(con_info->data,"ftp_id",value);
+											if(ok = check_data_ftp_mod(con_info->data,result))
+												task_set_type(task,T_FTP_MOD);
+										} else {
+											/* ALTA FTP */
+											if(ok = check_data_ftp_add(con_info->data,result))
+												task_set_type(task,T_FTP_ADD);
+										}
+									} else {
+										rest_server_url_error(result,&ok);
+									}
+								} else {
+									/* EDICION SITIO */
+									if(ok = check_data_site_mod(con_info->data,result))
+										task_set_type(task,T_SITE_MOD);
+								}
 							} else {
 								/* ALTA SITIO */
 								if(ok = check_data_site_add(con_info->data,result))
@@ -357,21 +385,39 @@ static int handle_DELETE(struct MHD_Connection *connection, const char *url){
 	} else if(0 == strcmp("users",value)){
 		parce_data((char *)url,'/',&pos,value);
 		if(strlen(value)> 0){
-			dictionary_add(task_get_data(task),"user_id",value);
+			dictionary_add(data,"user_id",value);
 			parce_data((char *)url,'/',&pos,value);
 			if(strlen(value)>0){
 				if(0 == strcmp("susc",value)) {
 					parce_data((char *)url,'/',&pos,value);
 					if(strlen(value)>0){
-						dictionary_add(task_get_data(task),"susc_id",value);
+						dictionary_add(data,"susc_id",value);
 						parce_data((char *)url,'/',&pos,value);
 						if(strlen(value)>0){
 							if(0 == strcmp("sites",value)) {
 								parce_data((char *)url,'/',&pos,value);
 								if(strlen(value)>0) {
-									/* BORRADO SITIO */
-									dictionary_add(task_get_data(task),"site_id",value);
-									task_set_type(task,T_SITE_DEL);
+									dictionary_add(data,"site_id",value);
+									parce_data((char *)url,'/',&pos,value);
+									if(strlen(value)>0) {
+										if(0 == strcmp("ftp_users",value)) {
+											parce_data((char *)url,'/',&pos,value);
+											if(strlen(value)>0) {
+												dictionary_add(data,"ftp_id",value);
+												/* BORRADO FTP */
+												if(ok = check_data_ftp_del(data,result))
+													task_set_type(task,T_FTP_DEL);
+											} else {
+												rest_server_url_error(result,&ok);
+											}
+										} else {
+											rest_server_url_error(result,&ok);
+										}
+									} else {
+										/* BORRADO SITIO */
+										if(ok = check_data_site_del(data,result))
+											task_set_type(task,T_SITE_DEL);
+									}
 								} else {
 									rest_server_url_error(result,&ok);
 								}
@@ -380,7 +426,8 @@ static int handle_DELETE(struct MHD_Connection *connection, const char *url){
 							}
 						} else {
 							/* BORRADO SUSCRIPCION */
-							task_set_type(task,T_SUSC_DEL);
+							if(ok = check_data_susc_del(data,result))
+								task_set_type(task,T_SUSC_DEL);
 						}
 					} else {
 						rest_server_url_error(result,&ok);
@@ -390,7 +437,8 @@ static int handle_DELETE(struct MHD_Connection *connection, const char *url){
 				}
 			} else {
 				/* BORRAR USUARIO */
-				task_set_type(task,T_USER_DEL);
+				if(ok = check_data_user_del(data,result))
+					task_set_type(task,T_USER_DEL);
 			}
 		} else {
 			rest_server_url_error(result,&ok);
@@ -497,7 +545,6 @@ static int handle_GET(struct MHD_Connection *connection, const char *url){
 			parce_data((char *)url,'/',&pos,value);
 			if(strlen(value)>0){
 				/* PARA LAS SUSCRIPCIONES DEL USUARIO */
-				printf("Handle_GET suscripciones\n");
 				if(0 == strcmp("susc",value)) {
 					parce_data((char *)url,'/',&pos,value);
 					if(strlen(value)>0){
@@ -507,11 +554,26 @@ static int handle_GET(struct MHD_Connection *connection, const char *url){
 							if(0 == strcmp("sites",value)){
 								parce_data((char *)url,'/',&pos,value);
 								if(strlen(value)>0){
-									printf("Handle_GET sitios web\n");
-									/* Show site */
 									dictionary_add(task_get_data(task),"site_id",value);
-									if(ok = check_site_show(data,result))
-										task_set_type(task,T_SITE_SHOW);
+									parce_data((char *)url,'/',&pos,value);
+									if(strlen(value)>0){
+										if(0 == strcmp("ftp_users",value)){
+											parce_data((char *)url,'/',&pos,value);
+											if(strlen(value)>0){
+												rest_server_url_error(result,&ok);
+											} else {
+												/* Listado ftp */
+												if(ok = check_ftp_list(data,result))
+													task_set_type(task,T_FTP_LIST);
+											}
+										} else {
+											rest_server_url_error(result,&ok);
+										}
+									} else {
+										/* Show sitio */
+										if(ok = check_site_show(data,result))
+											task_set_type(task,T_SITE_SHOW);
+									}
 								} else {
 									/* Listado de sitios */
 									if(ok = check_site_list(data,result))
@@ -539,7 +601,6 @@ static int handle_GET(struct MHD_Connection *connection, const char *url){
 			}
 		} else {
 			/* Listado de usuarios */
-			printf("Handle_GET listado usuarios\n");
 			task_set_type(task,T_USER_LIST);
 		}
 

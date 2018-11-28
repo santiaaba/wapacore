@@ -968,6 +968,80 @@ void task_site_start(T_task *t, T_db *db){
 	}
 }
 
+/**************************************
+ * 		TASK FTP
+ **************************************/
+void task_ftp_list(T_task *t, T_db *db){
+	if(t->status == T_TODO){
+		if(db_susc_exist(db,t->data,error,&db_fail)){
+			sprintf(send_message,"bsite_id|%s",
+			dictionary_get(t->data,"site_id"));
+			task_cloud_send(t,send_message);
+		} else {
+			if(db_fail)
+				task_done(t,ERROR_FATAL);
+			else
+				task_done(t,error);
+		}
+	} else if(t->status == T_WAITING){
+		task_cloud_get(t);
+	}
+}
+
+void task_ftp_add(T_task *t, T_db *db){
+	if(t->status == T_TODO){
+		if(db_susc_exist(db,t->data,error,&db_fail)){
+			sprintf(send_message,"csite_id|%s|user_id|%s|passwd|%s",
+			dictionary_get(t->data,"site_id"),
+			dictionary_get(t->data,"user_id"),
+			dictionary_get(t->data,"passwd"));
+			task_cloud_send(t,send_message);
+		} else {
+			if(db_fail)
+				task_done(t,ERROR_FATAL);
+			else
+				task_done(t,error);
+		}
+	} else if(t->status == T_WAITING){
+		task_cloud_get(t);
+	}
+}
+
+void task_ftp_del(T_task *t, T_db *db){
+	if(t->status == T_TODO){
+		if(db_susc_exist(db,t->data,error,&db_fail)){
+			sprintf(send_message,"fftp_id|%s",
+			dictionary_get(t->data,"ftp_id"));
+			task_cloud_send(t,send_message);
+		} else {
+			if(db_fail)
+				task_done(t,ERROR_FATAL);
+			else
+				task_done(t,error);
+		}
+	} else if(t->status == T_WAITING){
+		task_cloud_get(t);
+	}
+}
+
+void task_ftp_mod(T_task *t, T_db *db){
+	if(t->status == T_TODO){
+		if(db_susc_exist(db,t->data,error,&db_fail)){
+			sprintf(send_message,"gftp_id|%s|passwrd|%s",
+			dictionary_get(t->data,"ftp_id"),
+			dictionary_get(t->data,"passwd"));
+			task_cloud_send(t,send_message);
+		} else {
+			if(db_fail)
+				task_done(t,ERROR_FATAL);
+			else
+				task_done(t,error);
+		}
+	} else if(t->status == T_WAITING){
+		task_cloud_get(t);
+	}
+}
+
 void task_hw_server_list(T_task *t, T_list_cloud *cl){
 	char send_message[200];
 
@@ -1083,6 +1157,11 @@ void task_run(T_task *t, T_db *db, T_list_cloud *cl){
 			case T_SITE_DEL: task_site_del(t,db); break;
 			case T_SITE_STOP: task_site_stop(t,db); break;
 			case T_SITE_START: task_site_start(t,db); break;
+
+			case T_FTP_LIST: task_ftp_list(t,db); break;
+			case T_FTP_ADD: task_ftp_add(t,db); break;
+			case T_FTP_DEL: task_ftp_del(t,db); break;
+			case T_FTP_MOD: task_ftp_mod(t,db); break;
 
 			case T_HW_SERVER_LIST:task_hw_server_list(t,cl); break;
 			case T_HW_SERVER_SHOW:task_hw_server_show(t,cl); break;

@@ -19,6 +19,11 @@
 #define PUT		2
 #define DELETE		3
 
+#define CHECK_REST_ID(ID,NOMBRE)	if(!valid_id(dictionary_get(data,"ID"))){ \
+                			strcpy(result,"{\"task\":\"\",\"stauts\":\"ERROR\",\"data\":\"ID NOMBRE invalido\"}"); \
+                			return 0; \
+        			}
+
 struct connection_info_struct {
         int connectiontype;
         T_dictionary *data;
