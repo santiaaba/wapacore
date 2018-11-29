@@ -972,6 +972,10 @@ void task_site_start(T_task *t, T_db *db){
  * 		TASK FTP
  **************************************/
 void task_ftp_list(T_task *t, T_db *db){
+	char error[200];
+	int db_fail;
+	char send_message[200];
+
 	if(t->status == T_TODO){
 		if(db_susc_exist(db,t->data,error,&db_fail)){
 			sprintf(send_message,"bsite_id|%s",
@@ -989,11 +993,15 @@ void task_ftp_list(T_task *t, T_db *db){
 }
 
 void task_ftp_add(T_task *t, T_db *db){
+	char error[200];
+	int db_fail;
+	char send_message[200];
+
 	if(t->status == T_TODO){
 		if(db_susc_exist(db,t->data,error,&db_fail)){
-			sprintf(send_message,"csite_id|%s|user_id|%s|passwd|%s",
+			sprintf(send_message,"csite_id|%s|name|%s|passwd|%s",
 			dictionary_get(t->data,"site_id"),
-			dictionary_get(t->data,"user_id"),
+			dictionary_get(t->data,"name"),
 			dictionary_get(t->data,"passwd"));
 			task_cloud_send(t,send_message);
 		} else {
@@ -1008,6 +1016,10 @@ void task_ftp_add(T_task *t, T_db *db){
 }
 
 void task_ftp_del(T_task *t, T_db *db){
+	char error[200];
+	int db_fail;
+	char send_message[200];
+
 	if(t->status == T_TODO){
 		if(db_susc_exist(db,t->data,error,&db_fail)){
 			sprintf(send_message,"fftp_id|%s",
@@ -1025,6 +1037,10 @@ void task_ftp_del(T_task *t, T_db *db){
 }
 
 void task_ftp_mod(T_task *t, T_db *db){
+	char error[200];
+	int db_fail;
+	char send_message[200];
+
 	if(t->status == T_TODO){
 		if(db_susc_exist(db,t->data,error,&db_fail)){
 			sprintf(send_message,"gftp_id|%s|passwrd|%s",
@@ -1103,8 +1119,8 @@ void task_run(T_task *t, T_db *db, T_list_cloud *cl){
 	int cloud_id;
 	int db_fail;
 
-	if(t->type <= T_SUSC_DEL ){
-		/* No son acciones sobre una nube */
+	if(t->type <= T_SUSC_START ){
+		/* No son acciones sobre una nube directa */
 		switch(t->type){
 			/* USERS */
 			case T_USER_LIST:	task_user_list(t,db); break;
@@ -1131,7 +1147,7 @@ void task_run(T_task *t, T_db *db, T_list_cloud *cl){
 		/* Son acciones sobre alguna nube */
 		if(t->cloud == NULL){
 			/* Averiguamos la nube */
-			if( t->type <= T_SITE_DEL){
+			if( t->type <= T_HW_SERVER_START){
 				/* Acciones sobre una nube web */
 				valor = dictionary_get(t->data,"susc_id");
 				//strcpy(plan_id,"0");	//BUSCAR EL PLAN ID CORRESPONDIENTE AL SUSCRIPTION ID

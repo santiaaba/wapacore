@@ -124,6 +124,10 @@ int cloud_send_receive(T_cloud *cloud, char *send_message, uint32_t send_message
 	int pos;
 	uint32_t c=0;	//cantidad de datos enviados o recibidos
 
+	if(cloud == NULL){
+		printf("cloud_send_receive: ERROR. Cloud nulo\n");
+		return 0;
+	}
 	if( send_message[send_message_size-1] != '\0'){
 		printf("cloud_send_receive: ERROR. send_message no termina en \\0\n");
 		return 0;
@@ -146,7 +150,6 @@ int cloud_send_receive(T_cloud *cloud, char *send_message, uint32_t send_message
 		int_to_4bytes(&parce_size,&(buffer[4]));
 		memcpy(buffer + HEADER_SIZE,send_message + c,parce_size);
 		c += parce_size;
-		printf("Listos para enviar %i\n",cloud->socket);
 		if(send(cloud->socket,buffer,BUFFER_SIZE,0)<0){
 			printf("Socket no responde\n");
 			cloud_change_status(cloud,C_UNKNOWN);

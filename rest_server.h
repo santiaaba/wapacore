@@ -19,8 +19,8 @@
 #define PUT		2
 #define DELETE		3
 
-#define CHECK_REST_ID(ID,NOMBRE)	if(!valid_id(dictionary_get(data,"ID"))){ \
-                			strcpy(result,"{\"task\":\"\",\"stauts\":\"ERROR\",\"data\":\"ID NOMBRE invalido\"}"); \
+#define CHECK_VALID_ID(X,Y)	if(!valid_id(dictionary_get(data,#X))){ \
+                			sprintf(result,"{\"task\":\"\",\"stauts\":\"ERROR\",\"data\":\"ID %s invalido\"}",#Y); \
                 			return 0; \
         			}
 

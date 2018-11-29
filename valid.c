@@ -57,7 +57,7 @@ int valid_user_name(char *s){
 	}
 	return ok;
 }
-int valid_pass(char *s){
+int valid_passwd(char *s){
 
 	int ok=1;
 	int size;
@@ -116,6 +116,7 @@ int valid_id(char *s){
 	int size;
 	int i;
 
+	printf("Validando id: %s\n",s);
 	if(s == NULL)
 		return 0;
 	size = strlen(s);

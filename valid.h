@@ -25,7 +25,7 @@
 #define ID_MAX_LEN		20
 
 int valid_user_name(char *s);
-int valid_pass(char *s);
+int valid_passwd(char *s);
 int valid_email(char *s);
 int valid_domain(char *s);
 int valid_id(char *s);
