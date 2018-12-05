@@ -29,6 +29,7 @@ void task_init(T_task *t, T_tasktoken *token, T_dictionary *data, T_logs *logs){
 	printf("dictionary:");
 	dictionary_print(data);
 	random_task_id(t->id);
+	t->time = time(NULL);
 	t->token = token;
 	t->type = T_NONE;
 	t->logs = logs;
@@ -82,16 +83,18 @@ void task_print_status(T_task *t, char *s){
 
 void task_done(T_task *t, char *message){
 	/* Completa los datos para indicar que un task ha terminado */
-	printf("Entro\n");
 	t->status = T_DONE;
-	printf("Largo: %i\n",strlen(message)+1);
+	t->time = time(NULL);
 	t->result=(char *)realloc(t->result,strlen(message)+1);
 	strcpy(t->result,message);
-	printf("PASO\n");
 }
 
 char *tob_get_id(T_task *t){
 	return t->id;
+}
+
+time_t task_get_time(T_task *t){
+	return t->time;
 }
 
 int task_assign_cloud(T_task *t, T_list_cloud *cl){
@@ -145,7 +148,10 @@ int task_susc_add(T_task *t, T_db *db, T_list_cloud *cl){
 				/* La suscripcion utliza esta nube */
 				c = list_cloud_find_id(cl,cloud_id);
 				t->cloud = c;
-				sprintf(send_message,"0susc_id|%s", susc_id);
+				/* TODAS las nubes reciben el mismo mensaje y toman el dato que necesiten */
+				sprintf(send_message,"0susc_id|%s|web_quota|%s|web_sites|%s",
+					susc_id,dictionary_get(t->data,"web_quota"),
+					susc_id,dictionary_get(t->data,"web_sites"));
 				if(!task_cloud_send(t,send_message)){
 					printf("Nube no responde %i\n",t->step);
 					task_done(t,"{\"code\":\"300\",\"info\":\"Nube inaccesible. Suscripcion pendiente\"}");
@@ -999,7 +1005,7 @@ void task_ftp_add(T_task *t, T_db *db){
 
 	if(t->status == T_TODO){
 		if(db_susc_exist(db,t->data,error,&db_fail)){
-			sprintf(send_message,"csite_id|%s|name|%s|passwd|%s",
+			sprintf(send_message,"hsite_id|%s|name|%s|passwd|%s",
 			dictionary_get(t->data,"site_id"),
 			dictionary_get(t->data,"name"),
 			dictionary_get(t->data,"passwd"));
@@ -1022,7 +1028,8 @@ void task_ftp_del(T_task *t, T_db *db){
 
 	if(t->status == T_TODO){
 		if(db_susc_exist(db,t->data,error,&db_fail)){
-			sprintf(send_message,"fftp_id|%s",
+			sprintf(send_message,"fsite_id|%s|ftp_id|%s",
+			dictionary_get(t->data,"site_id"),
 			dictionary_get(t->data,"ftp_id"));
 			task_cloud_send(t,send_message);
 		} else {
@@ -1226,6 +1233,7 @@ T_task *heap_task_pop(T_heap_task *h){
 		if(h->first == NULL)
 			h->last = NULL;
 		free(aux);
+		h->size--;
 		return taux;
 	} else {
 		return NULL;
@@ -1291,6 +1299,7 @@ void bag_task_add(T_bag_task *b, T_task *t){
 }
 
 T_task *bag_site_remove(T_bag_task *b){
+	// Elimina el nodo apuntado actualmente
 	bag_t_node *prio;
 	bag_t_node *aux;
 	T_task *element = NULL;
@@ -1313,6 +1322,7 @@ T_task *bag_site_remove(T_bag_task *b){
 		b->actual = aux->next;
 		element = aux->data;
 		free(aux);
+		b->size--;
 	}
 	return element;
 }
@@ -1339,6 +1349,26 @@ T_task *bag_task_pop(T_bag_task *b, T_taskid *id){
 
 unsigned int bag_task_size(T_bag_task *b){
 	return b->size;
+}
+
+void bag_task_timedout(T_bag_task *b, int d){
+	/* Elimina de la estructura todas las
+	 * tareas cuya diferencia de tiempo entre
+	 * finalizado y la hora actual sea lo que
+	 * se indica en el parametro d */
+
+	T_task *taux = NULL;
+	time_t now = time(NULL);
+
+	printf("bag_task_timedout\n");
+	b->actual = b->first;
+	while((b->actual != NULL)){
+		if(d < difftime(now,task_get_time(b->actual->data))){
+			taux = bag_site_remove(b);
+			free(taux);
+		} else
+			b->actual = b->actual->next;
+	}
 }
 
 void bag_task_print(T_bag_task *b){

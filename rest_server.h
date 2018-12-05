@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include "json.h"
 #include "dictionary.h"
+#include "config.h"
 #include "task.h"
 #include "valid.h"
 
@@ -33,9 +34,11 @@ struct connection_info_struct {
 typedef struct t_r_server {
 	T_heap_task tasks_todo;
 	T_bag_task tasks_done;
+	T_config *config;
 	struct MHD_Daemon *rest_daemon;
 	pthread_t thread;
 	pthread_t do_task;
+	pthread_t purge_done;
 	pthread_mutex_t mutex_heap_task;
 	pthread_mutex_t mutex_bag_task;
 	T_logs *logs;
@@ -49,7 +52,7 @@ typedef struct t_r_server {
 extern T_rest_server rest_server;
 extern T_logs logs;
 
-void rest_server_init(T_rest_server *r, T_db *db, T_list_cloud *cl);
+void rest_server_init(T_rest_server *r, T_db *db, T_list_cloud *cl, T_config *config);
 void rest_server_add_task(T_rest_server *r, T_task *j);
 void rest_server_lock(T_rest_server *r);
 void rest_server_unlock(T_rest_server *r);

@@ -28,6 +28,16 @@ void config_parce_line(char *buf, char *atr, char *val){
 	}
 }
 
+void config_init(T_config *conf){
+	strcpy(conf->db_server,"");
+	strcpy(conf->db_name,"");
+	strcpy(conf->db_user,"");
+	strcpy(conf->db_pass,"");
+	strcpy(conf->logs_file,"");
+	conf->task_done_time = 60;
+	conf->logs_level = L_ERROR;
+}
+
 int config_load(const char *filename, T_config *conf){
 	/* Lee de un archivo de configuracion */
 	FILE *fp;
@@ -45,6 +55,7 @@ int config_load(const char *filename, T_config *conf){
 			if(0 == strcmp(&atr[0],"db_pass")){strcpy(conf->db_pass,&val[0]);}
 			if(0 == strcmp(&atr[0],"log_file")){strcpy(conf->logs_file,&val[0]);}
                         if(0 == strcmp(&atr[0],"log_level")){conf->logs_level = logs_str2level(&val[0]);}
+                        if(0 == strcmp(&atr[0],"task_done_time")){conf->task_done_time = atoi(&val[0]);}
 		}
 		fclose(fp);
 		return 1;
@@ -68,6 +79,9 @@ char *config_db_pass(T_config *conf){
 }
 char *config_logs_file(T_config *conf){
 	return conf->logs_file;
+}
+uint32_t config_task_done_time(T_config *conf){
+	return conf->task_done_time;
 }
 T_logs_level config_logs_level(T_config *conf){
 	return conf->logs_level;

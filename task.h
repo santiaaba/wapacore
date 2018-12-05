@@ -112,6 +112,7 @@ typedef struct {
 	T_task_type type;		//tipo de accion a realizar
 	T_task_status status;		//estado del task
 	T_dictionary *data;		//datos necesarios para realizar la accion
+	time_t time;			//Instante de tiempo en que la tarea ingresa o finaliza
 	T_cloud *cloud;			//Cuando interviene una nube... queda asignada
 	T_logs *logs;
 	int step;			// Para acciones que involucran mas de un paso... indica el paso
@@ -120,6 +121,7 @@ typedef struct {
 } T_task;
 
 void task_init(T_task *t, T_tasktoken *token, T_dictionary *data, T_logs *logs);
+time_t task_get_time(T_task *t);
 void task_set_type(T_task *t, T_task_type type);
 void task_destroy(T_task **t);
 T_dictionary *task_get_data(T_task *t);
@@ -173,6 +175,7 @@ void bag_task_add(T_bag_task *b, T_task *t);
 T_task *bag_task_pop(T_bag_task *b, T_taskid *id);
 unsigned int bag_task_size(T_bag_task *b);
 void bag_task_print(T_bag_task *b);
+void bag_task_timedout(T_bag_task *b, int d);
 
 #define JOB_H
 #endif

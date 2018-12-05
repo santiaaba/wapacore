@@ -130,7 +130,7 @@ int check_ftp_add(T_dictionary *data, char *result){
 		strcpy(result,"{\"task\":\"\",\"stauts\":\"ERROR\",\"data\":\"Password invalida\"}");
 		return 0;
 	}
-	if(!valid_name(dictionary_get(data,"name"))){
+	if(!valid_ftp_name(dictionary_get(data,"name"))){
 		strcpy(result,"{\"task\":\"\",\"stauts\":\"ERROR\",\"data\":\"nombre usuario invalido\"}");
 		return 0;
 	}
@@ -154,9 +154,28 @@ void rest_server_add_task(T_rest_server *r, T_task *j){
 	pthread_mutex_unlock(&(r->mutex_heap_task));
 }
 
+uint32_t rest_server_num_tasks(T_rest_server *r){
+	printf("cantidad tareas: %u,%u\n",heap_task_size(&(r->tasks_todo)), bag_task_size(&(r->tasks_done)));
+	return (heap_task_size(&(r->tasks_todo)) + bag_task_size(&(r->tasks_done)));
+}
+
 void rest_server_url_error(char *result, int *ok){
 	strcpy(result,"{\'task\':\'\',\'stauts\':\'ERROR\',\'data\':\'api call invalid\'}");
 	*ok=0;
+}
+
+void *rest_server_purge_done(void *param){
+	/* Se encarga de purgar cada 10 segundos la estructura
+	 * de tareas finalizadas */
+
+	T_rest_server *r= (T_rest_server *)param;
+	while(1){
+		sleep(10);
+		pthread_mutex_lock(&(r->mutex_bag_task));
+			bag_task_timedout(&(r->tasks_done),
+			config_task_done_time(r->config));
+		pthread_mutex_unlock(&(r->mutex_bag_task));
+	}
 }
 
 void *rest_server_do_task(void *param){
@@ -169,11 +188,16 @@ void *rest_server_do_task(void *param){
 			task = heap_task_pop(&(r->tasks_todo));
 		pthread_mutex_unlock(&(r->mutex_heap_task));
 		if(task != NULL){
-			task_run(task,r->db,r->clouds);
+			/* Si la tarea hace mas de un minuto que esta en cola
+ 			 * vence por timeout */
+			if(60 < difftime(time(NULL),task_get_time(task)))
+				task_done(task,"{\"status\":\"DONE\",\"data\":\"Task time Out\"}");
+			else
+				task_run(task,r->db,r->clouds);
+
 			if(task_get_status(task) == T_DONE){
 				pthread_mutex_lock(&(r->mutex_bag_task));
 					bag_task_add(&(r->tasks_done),task);
-					bag_task_print(&(r->tasks_done));
 				pthread_mutex_unlock(&(r->mutex_bag_task));
 			} else {
 				pthread_mutex_lock(&(r->mutex_heap_task));
@@ -354,8 +378,12 @@ static int handle_POST(struct MHD_Connection *connection,
 	}
 
 	if(ok){
-		rest_server_add_task(&rest_server,task);
-		sprintf(result,"{\"task\":\"%s\",\"status\":\"TODO\"}",task_get_id(task));
+		if(rest_server_num_tasks(&rest_server) < 200 ){
+			rest_server_add_task(&rest_server,task);
+			sprintf(result,"{\"task\":\"%s\",\"status\":\"TODO\"}",task_get_id(task));
+		} else {
+			sprintf(result,"{\"task\":\"%s\",\"status\":\"ERROR\",\"data\":\"Superando limite de tareas\"}");
+		}
 	} else
 		task_destroy(&task);
 	
@@ -459,8 +487,12 @@ static int handle_DELETE(struct MHD_Connection *connection, const char *url){
 	}
 
 	if(ok){
-		rest_server_add_task(&rest_server,task);
-		sprintf(result,"{\"task\":\"%s\",\"status\":\"TODO\"}",task_get_id(task));
+		if(rest_server_num_tasks(&rest_server) < 200 ){
+			rest_server_add_task(&rest_server,task);
+			sprintf(result,"{\"task\":\"%s\",\"status\":\"TODO\"}",task_get_id(task));
+		} else {
+			sprintf(result,"{\"task\":\"%s\",\"status\":\"ERROR\",\"data\":\"Superando limite de tareas\"}");
+		}
 	} else {
 		task_destroy(&task);
 	}
@@ -637,8 +669,12 @@ static int handle_GET(struct MHD_Connection *connection, const char *url){
 
 	if(ok){
 		if(!isTaskStatus){
-			sprintf(result,"{'task':'%s','status':'TODO'}",task_get_id(task));
-			rest_server_add_task(&rest_server,task);
+			if(rest_server_num_tasks(&rest_server) < 200 ){
+				sprintf(result,"{'task':'%s','status':'TODO'}",task_get_id(task));
+				rest_server_add_task(&rest_server,task);
+			} else {
+				sprintf(result,"{\"task\":\"%s\",\"status\":\"ERROR\",\"data\":\"Superando limite de tareas\"}");
+			}
 		}
 	} else 
 		task_destroy(&task);
@@ -741,16 +777,20 @@ void *rest_server_start(void *param){
 			request_completed, NULL, MHD_OPTION_END);
 }
 
-void rest_server_init(T_rest_server *r, T_db *db, T_list_cloud *c){
+void rest_server_init(T_rest_server *r, T_db *db, T_list_cloud *c, T_config *config){
 
 	r->db = db;
+	r->config = config;
 	r->clouds = c;
 	heap_task_init(&(r->tasks_todo));
 	bag_task_init(&(r->tasks_done));
-	if(0 != pthread_create(&(r->thread), NULL, &rest_server_start, r)){
+	if(0 != pthread_create(&(r->purge_done), NULL, &rest_server_purge_done, r)){
 		exit(2);
 	}
 	if(0 != pthread_create(&(r->do_task), NULL, &rest_server_do_task, r)){
+		exit(2);
+	}
+	if(0 != pthread_create(&(r->thread), NULL, &rest_server_start, r)){
 		exit(2);
 	}
 }

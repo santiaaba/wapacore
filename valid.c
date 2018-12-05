@@ -140,3 +140,7 @@ int valid_site_name(char *s){
 int valid_site_url(char *s){
 	return 1;
 }
+
+valid_ftp_name(char *s){
+	return 1;
+}

@@ -44,6 +44,10 @@ void main(){
 
 	//Inicializamos la semilla random
 	srand(time(NULL));
+
+	//Inicializamos la estructura de configuracion
+	config_init(&config);
+
 	//Levantamos la configuracion 
 	if(!config_load("core.conf",&config))
 		exit(1);
@@ -69,7 +73,7 @@ void main(){
 	}
 
 	// Iniciamos el server REST para la API
-	rest_server_init(&rest_server,&db,&clouds);
+	rest_server_init(&rest_server,&db,&clouds,&config);
 
 	while(1){
 		//check_clouds(&clouds);

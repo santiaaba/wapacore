@@ -536,6 +536,18 @@ int db_susc_add(T_db *db, T_dictionary *d, char *error, int *db_fail){
 	sprintf(susc_id_char,"%lu",susc_id);
 	printf("suscription_id nuevo %s\n",susc_id_char);
 	dictionary_add(d,"susc_id",susc_id_char);
+
+	/* Ahora del plan tomamos los datos que necesitamos para dar de alta la suscripcion enc ada nube */
+	sprintf(sql,"select web_quota,web_sites from plan where id=%s",dictionary_get(d,"plan_id"));
+	if(mysql_query(db->con,sql)){
+		*db_fail=1;
+		return 0;
+	}
+	result = mysql_store_result(db->con);
+	row = mysql_fetch_row(result);
+	dictionary_add(d,"web_quota",row[0]);
+	dictionary_add(d,"web_sites",row[1]);
+
 	strcpy(error,"{\"code\":\"211\",\"info\":\"Suscripcion agregada\"}");
 	*db_fail=0;
 	return 1;
