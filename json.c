@@ -3,23 +3,27 @@
 int json_user_list(char **data, MYSQL_RES *result){
 
 	MYSQL_ROW row;
-	int size=100;
+	int size=200;
 	int a=0;
 	
 	*data = (char *) realloc(*data,size);
 	strcpy(*data,"{\"code\":\"200\",\"info\":[");
 	while ((row = mysql_fetch_row(result))){
 		a++;
-		if((strlen(*data)) + strlen(row[0]) + 5 > size){
-			size = size + 100;
+		//printf("Tamanos: %i, %i, %i, %i\n",strlen(*data),strlen(row[0]),strlen(row[1]),size);
+		if((strlen(*data)) + strlen(row[0]) + strlen(row[1]) + strlen(row[2]) + strlen(row[3]) + 45 > size){
+			//printf("Entro realloc\n");
+			size = size + 200;
 			*data = (char *) realloc(*data,size);
 		}
-		sprintf(*data,"%s%s,",*data,row[0]);
+		sprintf(*data,"%s{\"id\":\"%s\",\"name\":\"%s\",\"email\":\"%s\",\"status\":\"%s\"},",*data,row[0],row[1],row[2],row[3]);
 	}
 	if(a)
 		(*data)[strlen(*data)-1] = ']';
 	else
 		strcat(*data,"]");
+	strcat(*data,"}");
+	//printf("Los usuario son: %s - %i\n",*data,strlen(*data));
 }
 
 int json_cloud_show(char **data, char *id, T_list_cloud *cl){
@@ -67,6 +71,7 @@ int json_cloud_list(char **data, MYSQL_RES *result, T_list_cloud *cl){
 		(*data)[strlen(*data)-1] = ']';
 	else
 		strcat(*data,"]");
+	strcat(*data,"}");
 	return 1;
 }
 

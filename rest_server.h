@@ -11,7 +11,7 @@
 #ifndef REST_SERVER_H
 #define REST_SERVER_H
 
-#define PORT		8888
+#define REST_PORT	8888
 #define POSTBUFFERSIZE  512
 #define MAXNAMESIZE     20
 #define MAXANSWERSIZE   512
@@ -32,6 +32,7 @@ struct connection_info_struct {
 };
 
 typedef struct t_r_server {
+	T_task *runningTask;
 	T_heap_task tasks_todo;
 	T_bag_task tasks_done;
 	T_config *config;

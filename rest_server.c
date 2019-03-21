@@ -34,15 +34,16 @@ int check_user_add(T_dictionary *data, char *result){
  	 * tengan un formato correcto. En *result retorna
  	 * el error en formato json de ser necesario. */
 	if(!valid_user_name(dictionary_get(data,"name"))){
-		strcpy(result,"{\"task\":\"\",\"stauts\":\"ERROR\",\"data\":\"Nombre usuario invalido\"}");
+		strcpy(result,"{\"task\":\"\",\"status\":\"ERROR\",\"data\":\"Nombre usuario invalido\"}");
 		return 0;
 	}
+	printf("LLEGOOOOO\n");
 	if(!valid_passwd(dictionary_get(data,"pass"))){
-		strcpy(result,"{\"task\":\"\",\"stauts\":\"ERROR\",\"data\":\"Password invalida\"}");
+		strcpy(result,"{\"task\":\"\",\"status\":\"ERROR\",\"data\":\"Password invalida\"}");
 		return 0;
 	}
 	if(!valid_email(dictionary_get(data,"email"))){
-		strcpy(result,"{\"task\":\"\",\"stauts\":\"ERROR\",\"data\":\"email invalido\"}");
+		strcpy(result,"{\"task\":\"\",\"status\":\"ERROR\",\"data\":\"email invalido\"}");
 		return 0;
 	}
 	return 1;
@@ -54,15 +55,15 @@ int check_user_mod(T_dictionary *data, char *result){
  	 * el error en formato json de ser necesario */
 	CHECK_VALID_ID(user_id,usuario)
 	if(!valid_user_name(dictionary_get(data,"name"))){
-		strcpy(result,"{\"task\":\"\",\"stauts\":\"ERROR\",\"data\":\"Nombre usuario invalido\"}");
+		strcpy(result,"{\"task\":\"\",\"status\":\"ERROR\",\"data\":\"Nombre usuario invalido\"}");
 		return 0;
 	}
 	if(!valid_passwd(dictionary_get(data,"pass"))){
-		strcpy(result,"{\"task\":\"\",\"stauts\":\"ERROR\",\"data\":\"Password invalida\"}");
+		strcpy(result,"{\"task\":\"\",\"status\":\"ERROR\",\"data\":\"Password invalida\"}");
 		return 0;
 	}
 	if(!valid_email(dictionary_get(data,"email"))){
-		strcpy(result,"{\"task\":\"\",\"stauts\":\"ERROR\",\"data\":\"email invalido\"}");
+		strcpy(result,"{\"task\":\"\",\"status\":\"ERROR\",\"data\":\"email invalido\"}");
 		return 0;
 	}
 	return 1;
@@ -106,7 +107,7 @@ int check_site_del(T_dictionary *data, char *result){
 }
 
 int check_cloud_show(T_dictionary *data, char *result){
-	CHECK_VALID_ID(susc_id,nube)
+	CHECK_VALID_ID(cloud_id,nube)
 	return 1;
 }
 
@@ -127,11 +128,11 @@ int check_ftp_add(T_dictionary *data, char *result){
 	CHECK_VALID_ID(susc_id,suscripcion)
 	CHECK_VALID_ID(site_id,sitio)
 	if(!valid_passwd(dictionary_get(data,"passwd"))){
-		strcpy(result,"{\"task\":\"\",\"stauts\":\"ERROR\",\"data\":\"Password invalida\"}");
+		strcpy(result,"{\"task\":\"\",\"status\":\"ERROR\",\"data\":\"Password invalida\"}");
 		return 0;
 	}
 	if(!valid_ftp_name(dictionary_get(data,"name"))){
-		strcpy(result,"{\"task\":\"\",\"stauts\":\"ERROR\",\"data\":\"nombre usuario invalido\"}");
+		strcpy(result,"{\"task\":\"\",\"status\":\"ERROR\",\"data\":\"nombre usuario invalido\"}");
 		return 0;
 	}
 	return 1;
@@ -160,7 +161,7 @@ uint32_t rest_server_num_tasks(T_rest_server *r){
 }
 
 void rest_server_url_error(char *result, int *ok){
-	strcpy(result,"{\'task\':\'\',\'stauts\':\'ERROR\',\'data\':\'api call invalid\'}");
+	strcpy(result,"{\"task\":\"\",\"status\":\"ERROR\",\"data\":\"api call invalid\"}");
 	*ok=0;
 }
 
@@ -179,29 +180,33 @@ void *rest_server_purge_done(void *param){
 }
 
 void *rest_server_do_task(void *param){
-	T_task *task;
 	T_rest_server *r= (T_rest_server *)param;
 
 	while(1){
-		sleep(2);
+		//sleep(2);
 		pthread_mutex_lock(&(r->mutex_heap_task));
-			task = heap_task_pop(&(r->tasks_todo));
+			r->runningTask = heap_task_pop(&(r->tasks_todo));
 		pthread_mutex_unlock(&(r->mutex_heap_task));
-		if(task != NULL){
+		if(r->runningTask != NULL){
 			/* Si la tarea hace mas de un minuto que esta en cola
  			 * vence por timeout */
-			if(60 < difftime(time(NULL),task_get_time(task)))
-				task_done(task,"{\"status\":\"DONE\",\"data\":\"Task time Out\"}");
-			else
-				task_run(task,r->db,r->clouds);
+			if(60 < difftime(time(NULL),task_get_time(r->runningTask)))
+				task_done(r->runningTask,"{\"status\":\"DONE\",\"data\":\"Task time Out\"}");
+			else {
+				//printf("DOOO\n");
+				task_run(r->runningTask,r->db,r->clouds);
+				//printf("fin DOOO\n");
+			}
 
-			if(task_get_status(task) == T_DONE){
+			if(task_get_status(r->runningTask) == T_DONE){
 				pthread_mutex_lock(&(r->mutex_bag_task));
-					bag_task_add(&(r->tasks_done),task);
+					bag_task_add(&(r->tasks_done),r->runningTask);
+					r->runningTask = NULL;
 				pthread_mutex_unlock(&(r->mutex_bag_task));
 			} else {
 				pthread_mutex_lock(&(r->mutex_heap_task));
-					heap_task_push(&(r->tasks_todo),task);
+					heap_task_push(&(r->tasks_todo),r->runningTask);
+					r->runningTask = NULL;
 				pthread_mutex_unlock(&(r->mutex_heap_task));
 			}
 		}
@@ -216,6 +221,10 @@ static int send_page(struct MHD_Connection *connection, const char *page){
 			MHD_RESPMEM_PERSISTENT);
 	if (!response)
 		return MHD_NO;
+
+	MHD_add_response_header(response,"Access-Control-Allow-Origin","*");
+	MHD_add_response_header(response,"Access-Control-Allow-Methods","POST, GET, DELETE");
+	MHD_add_response_header(response,"Access-Control-Allow-Headers","Access-Control-Allow-Origin");
 
 	ret = MHD_queue_response (connection, MHD_HTTP_OK, response);
 	MHD_destroy_response (response);
@@ -232,8 +241,7 @@ void rest_server_get_task(T_rest_server *r, T_taskid *taskid, char **message, un
 	pthread_mutex_lock(&(r->mutex_bag_task));
 	pthread_mutex_lock(&(r->mutex_heap_task));
 
-	/* Buscamos en la bolsa de tareas finalizadas. Si la encontramos,
- 	   bag_task_print la quita de la estructura bag. */
+	/* Buscamos en la bolsa de tareas finalizadas. */
 	bag_task_print(&(r->tasks_done));
 	//heap_task_print(&(r->tasks_todo));
 	task = bag_task_pop(&(r->tasks_done),taskid);
@@ -243,7 +251,11 @@ void rest_server_get_task(T_rest_server *r, T_taskid *taskid, char **message, un
 		task = heap_task_exist(&(r->tasks_todo),(char *)taskid);
 	}
 	if(task == NULL){
-		sprintf(*message,"{'taskid':'%s','status':'INEXIST'}",taskid);
+		/* Verificamos si esta actualmente corriendo */
+		task = r->runningTask;
+	}
+	if(task == NULL){
+		sprintf(*message,"{\"taskid\":\"%s\",\"status\":\"INEXIST\"}",taskid);
 	} else {
 		/* Armamos en message el resultado de la terea */
 		//task_print_status(task,status);
@@ -575,6 +587,14 @@ static int handle_GET(struct MHD_Connection *connection, const char *url){
 				} else {
 					task_set_type(task,T_HW_SERVER_LIST);
 				}
+			} else if(0 == strcmp("sites",value)) {
+				parce_data((char *)url,'/',&pos,value);
+				if(strlen(value)>0){
+					rest_server_url_error(result,&ok);
+				} else {
+					printf("PASO LIST SITES\n");
+					task_set_type(task,T_HW_SITE_LIST);
+				}
 			} else {
 				rest_server_url_error(result,&ok);
 			}
@@ -670,7 +690,7 @@ static int handle_GET(struct MHD_Connection *connection, const char *url){
 	if(ok){
 		if(!isTaskStatus){
 			if(rest_server_num_tasks(&rest_server) < 200 ){
-				sprintf(result,"{'task':'%s','status':'TODO'}",task_get_id(task));
+				sprintf(result,"{\"task\":\"%s\",\"status\":\"TODO\"}",task_get_id(task));
 				rest_server_add_task(&rest_server,task);
 			} else {
 				sprintf(result,"{\"task\":\"%s\",\"status\":\"ERROR\",\"data\":\"Superando limite de tareas\"}");
@@ -742,6 +762,7 @@ static int answer_to_connection (void *cls, struct MHD_Connection *connection,
 		*con_cls = (void *) con_info;
 		return MHD_YES;
 	}
+	printf("API_REST url: %s\n",url);
 
 	if (0 == strcmp (method, "GET")){
 		handle_GET(connection,url);
@@ -773,13 +794,14 @@ void *rest_server_start(void *param){
 	T_rest_server *r= (T_rest_server *)param;
 
 	r-> rest_daemon = MHD_start_daemon (MHD_USE_THREAD_PER_CONNECTION | MHD_USE_DEBUG,
-			80, NULL, NULL, &answer_to_connection, NULL, MHD_OPTION_NOTIFY_COMPLETED,
+			REST_PORT, NULL, NULL, &answer_to_connection, NULL, MHD_OPTION_NOTIFY_COMPLETED,
 			request_completed, NULL, MHD_OPTION_END);
 }
 
 void rest_server_init(T_rest_server *r, T_db *db, T_list_cloud *c, T_config *config){
 
 	r->db = db;
+	r->runningTask = NULL;
 	r->config = config;
 	r->clouds = c;
 	heap_task_init(&(r->tasks_todo));

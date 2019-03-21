@@ -28,6 +28,7 @@ void random_token(T_tasktoken value){
 void task_init(T_task *t, T_tasktoken *token, T_dictionary *data, T_logs *logs){
 	printf("dictionary:");
 	dictionary_print(data);
+	printf("\n");
 	random_task_id(t->id);
 	t->time = time(NULL);
 	t->token = token;
@@ -126,7 +127,7 @@ int task_susc_add(T_task *t, T_db *db, T_list_cloud *cl){
 	printf("Task alta suscripcion\n");
 	if(t->status == T_TODO){
 		if(t->step == 0){
-			/* Creamos la suscripcion en la base de datos. Que da en estado "pendiente" */
+			/* Creamos la suscripcion en la base de datos. Queda en estado "pendiente" */
 			if(!db_susc_add(db,t->data,error,&db_fail)){
 				if(db_fail)
 					task_done(t,ERROR_FATAL);
@@ -207,6 +208,7 @@ int task_susc_del(T_task *t, T_db *db, T_list_cloud *cl){
 	/* Verificamos que ese suscripción exista para el
  	 * usuario indicado */
 
+	printf("ttask_susc_del: Entrando\n");
 	susc_id = dictionary_get(t->data,"susc_id");
 	if(t->status == T_TODO){
 		printf("PASOOOOO: %i\n",t->step);
@@ -516,7 +518,9 @@ void task_user_list(T_task *t, T_db *db){
 		json_user_list(&aux,db_r);
 		task_done(t,aux);
 	}
+	//printf("FREEE aux: %p, %s \n",aux,aux);
 	free(aux);
+	//printf("fin FREEE aux\n");
 }
 
 void task_user_show(T_task *t, T_db *db){
@@ -575,18 +579,21 @@ int task_user_del(T_task *t, T_db *db, T_list_cloud *cl){
 	   en nubes */
 	int db_fail;
 	char error[200];
-	MYSQL_RES *result;
+	MYSQL_RES *result = NULL;
 	MYSQL_ROW row;
 
+	printf("task_user_del: Entrando\n");
 	if(t->status == T_TODO){
 		/* Eliminamos sus suscripciones */
 		if(db_susc_list(db,t->data,&result,error,&db_fail)){
 			/* Eliminamos la primer suscripcion del listado */
-			result = mysql_store_result(db->con);
+			printf("lalala %p\n",result);
+			printf("task_user_del: listado de suscripciones: %i\n",mysql_num_rows(result));
 			if(mysql_num_rows(result)> 0){
 				/* Quedan suscripciones */
 				row = mysql_fetch_row(result);
 				dictionary_add(t->data,"susc_id",row[0]);
+				printf("task_user_del:Borrando suscripcion\n");
 				task_susc_del(t,db,cl);
 			} else {
 				/* Ya no tiene suscripciones. Procedemos
@@ -772,6 +779,8 @@ int task_cloud_get(T_task *t){
  	 * o si la consulta a la misma falla. */
 	char send_message[100];
 	char *rcv_message = NULL;
+	char code[4];
+	char *s = NULL;
 	char result_code[10];
 	int pos = 0;
 	uint32_t rcv_message_size = 0;
@@ -784,7 +793,12 @@ int task_cloud_get(T_task *t){
 			parce_data(rcv_message + 1,'|',&pos,result_code);
 			printf("TASK_CLOUD_GET: %s\n",result_code);
 			t->result_code = atoi(result_code);
-			task_done(t,rcv_message+5);
+			memcpy(code,rcv_message+1,3);
+			code[3] = '\0';
+			s = (char *)malloc(sizeof(char) * (strlen(rcv_message) + 21));  //me excedo un poco. No importa
+			sprintf(s,"{\"code\":\"%s\",\"info\":%s}",code,rcv_message+5);
+			printf("AAAAA---%s---BBBBB\n",s);
+			task_done(t,s);
 		} else {
 			/* deberia ser un 2. Entonces task no existe en la nube */
 			task_done(t,ERROR_TASK_CLOUD);
@@ -794,6 +808,7 @@ int task_cloud_get(T_task *t){
 		task_done(t,ERROR_CLOUD);
 	}
 	free(rcv_message);
+	free(s);
 }
 
 /*************	TASK SITES  ***********************/
@@ -805,7 +820,6 @@ int task_site_list(T_task *t, T_db *db){
 	int db_fail;
 	char message[200];
 
-	printf("TASK_SITE_LIST\n");
 	if(t->status == T_TODO){
 		if(db_susc_exist(db,t->data,message,&db_fail)){
 			sprintf(send_message,"lsusc_id|%s", dictionary_get(t->data,"susc_id"));
@@ -1065,6 +1079,10 @@ void task_ftp_mod(T_task *t, T_db *db){
 	}
 }
 
+/**************************************
+ * 		Cloud hosting web	
+ **************************************/
+
 void task_hw_server_list(T_task *t, T_list_cloud *cl){
 	char send_message[200];
 
@@ -1116,6 +1134,18 @@ void task_hw_server_start(T_task *t, T_list_cloud *cl){
 	}
 }
 
+void task_hw_site_list(T_task *t, T_list_cloud *cl){
+	char send_message[200];
+
+	if(t->status == T_TODO){
+		task_assign_cloud(t,cl);
+		sprintf(send_message,"q");
+		task_cloud_send(t,send_message);
+	} else if(t->status == T_WAITING){
+		task_cloud_get(t);
+	}
+}
+
 /***************************************************/
 
 void task_run(T_task *t, T_db *db, T_list_cloud *cl){
@@ -1147,8 +1177,16 @@ void task_run(T_task *t, T_db *db, T_list_cloud *cl){
 			case T_SUSC_STOP:	task_susc_stop(t,db,cl); break;
 			case T_SUSC_START:	task_susc_start(t,db,cl); break;
 
+			/* Nubes */
 			case T_CLOUD_LIST:	task_cloud_list(t,db,cl); break;
 			case T_CLOUD_SHOW:	task_cloud_show(t,cl); break;
+
+			/* Nube hosting web */
+			case T_HW_SERVER_LIST:task_hw_server_list(t,cl); break;
+			case T_HW_SERVER_SHOW:task_hw_server_show(t,cl); break;
+			case T_HW_SERVER_STOP:task_hw_server_stop(t,cl); break;
+			case T_HW_SERVER_START:task_hw_server_start(t,cl); break;
+			case T_HW_SITE_LIST:task_hw_site_list(t,cl); break;
 		}
 	} else {
 		/* Son acciones sobre alguna nube */
@@ -1185,11 +1223,6 @@ void task_run(T_task *t, T_db *db, T_list_cloud *cl){
 			case T_FTP_ADD: task_ftp_add(t,db); break;
 			case T_FTP_DEL: task_ftp_del(t,db); break;
 			case T_FTP_MOD: task_ftp_mod(t,db); break;
-
-			case T_HW_SERVER_LIST:task_hw_server_list(t,cl); break;
-			case T_HW_SERVER_SHOW:task_hw_server_show(t,cl); break;
-			case T_HW_SERVER_STOP:task_hw_server_stop(t,cl); break;
-			case T_HW_SERVER_START:task_hw_server_start(t,cl); break;
 		}
 	}
 }

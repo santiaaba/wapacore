@@ -179,7 +179,7 @@ int db_cloud_list(T_db *db, MYSQL_RES **result){
 
 int db_user_list(T_db *db, MYSQL_RES **result){
 
-	mysql_query(db->con,"select id,name from user");
+	mysql_query(db->con,"select id,name,email,status from user");
 	if(mysql_errno(db->con)){
 		return 0;
 	}
@@ -537,8 +537,9 @@ int db_susc_add(T_db *db, T_dictionary *d, char *error, int *db_fail){
 	printf("suscription_id nuevo %s\n",susc_id_char);
 	dictionary_add(d,"susc_id",susc_id_char);
 
-	/* Ahora del plan tomamos los datos que necesitamos para dar de alta la suscripcion enc ada nube */
-	sprintf(sql,"select web_quota,web_sites from plan where id=%s",dictionary_get(d,"plan_id"));
+	/* Ahora del plan tomamos los datos que necesitamos para dar de alta la suscripcion en cada nube */
+	/* Para hosting web */
+	sprintf(sql,"select quota,sites,ftp_per_site from plan_web where id=%s",dictionary_get(d,"plan_id"));
 	if(mysql_query(db->con,sql)){
 		*db_fail=1;
 		return 0;
@@ -547,6 +548,13 @@ int db_susc_add(T_db *db, T_dictionary *d, char *error, int *db_fail){
 	row = mysql_fetch_row(result);
 	dictionary_add(d,"web_quota",row[0]);
 	dictionary_add(d,"web_sites",row[1]);
+	dictionary_add(d,"ftp_per_site",row[2]);
+
+	/* Para base de datos mysql */
+	/* IMPLEMENTAR */
+
+	/* Para base de datos mysql */
+	/* IMPLEMENTAR */
 
 	strcpy(error,"{\"code\":\"211\",\"info\":\"Suscripcion agregada\"}");
 	*db_fail=0;

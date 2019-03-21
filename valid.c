@@ -116,7 +116,6 @@ int valid_id(char *s){
 	int size;
 	int i;
 
-	printf("Validando id: %s\n",s);
 	if(s == NULL)
 		return 0;
 	size = strlen(s);
