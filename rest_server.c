@@ -399,6 +399,7 @@ static int handle_POST(struct MHD_Connection *connection,
 	} else
 		task_destroy(&task);
 	
+	printf("Enviando al cliente REST: %s\n",result);
 	send_page (connection,result);
 	return ok;
 }
@@ -508,6 +509,7 @@ static int handle_DELETE(struct MHD_Connection *connection, const char *url){
 	} else {
 		task_destroy(&task);
 	}
+	printf("Enviando al cliente REST: %s\n",result);
 	send_page (connection,result);
 	return ok;
 }
@@ -541,7 +543,7 @@ static int handle_GET(struct MHD_Connection *connection, const char *url){
 	if(0 == strcmp("plans",value)){
 		parce_data((char *)url,'/',&pos,value);
 		if(strlen(value)> 0){
-			dictionary_add(task_get_data(task),"id",value);
+			dictionary_add(task_get_data(task),"plan_id",value);
 			task_set_type(task,T_PLAN_SHOW);
 		} else {
 			task_set_type(task,T_PLAN_LIST);
@@ -698,6 +700,7 @@ static int handle_GET(struct MHD_Connection *connection, const char *url){
 		}
 	} else 
 		task_destroy(&task);
+	printf("Enviando al cliente REST: %s\n",result);
 	send_page (connection, result);
 	return ok;
 }

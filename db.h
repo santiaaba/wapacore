@@ -44,6 +44,10 @@ int db_user_exist(T_db *db, T_dictionary *d, char *error, int *db_fail);
 int db_user_stop(T_db *db, T_dictionary *d, char *error, int *db_fail);
 int db_user_start(T_db *db, T_dictionary *d, char *error, int *db_fail);
 
+/* PLAN */
+int db_plan_list(T_db *db, MYSQL_RES **result);
+int db_plan_show(T_db *db, T_dictionary *d, MYSQL_RES **result, char *error, int *db_fail);
+
 /* SUSCRIPTION */
 int db_susc_prepare(T_db *db, T_dictionary *d, int action);
 int db_susc_broken(T_db *db, T_dictionary *d, char *error, int *db_fail);

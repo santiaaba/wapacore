@@ -26,6 +26,30 @@ int json_user_list(char **data, MYSQL_RES *result){
 	//printf("Los usuario son: %s - %i\n",*data,strlen(*data));
 }
 
+int json_plan_list(char **data, MYSQL_RES *result){
+
+	MYSQL_ROW row;
+	int size=200;
+	int a=0;
+	
+	*data = (char *) realloc(*data,size);
+	strcpy(*data,"{\"code\":\"200\",\"info\":[");
+	while ((row = mysql_fetch_row(result))){
+		a++;
+		if((strlen(*data)) + strlen(row[0]) + strlen(row[1]) + strlen(row[2]) + 45 > size){
+			size = size + 200;
+			*data = (char *) realloc(*data,size);
+		}
+		sprintf(*data,"%s{\"id\":\"%s\",\"name\":\"%s\",\"status\":\"%s\"},",*data,row[0],row[1],row[2]);
+	}
+	if(a)
+		(*data)[strlen(*data)-1] = ']';
+	else
+		strcat(*data,"]");
+	strcat(*data,"}");
+}
+
+
 int json_cloud_show(char **data, char *id, T_list_cloud *cl){
 
 	T_cloud *c;
@@ -75,6 +99,24 @@ int json_cloud_list(char **data, MYSQL_RES *result, T_list_cloud *cl){
 	return 1;
 }
 
+int json_plan_show(char **data, MYSQL_RES *result){
+
+	MYSQL_ROW row;
+	int size=1000;	//Deberian entrar todos los datos. Sino ampliar 
+
+	*data = (char *) realloc(*data,size);
+	row = mysql_fetch_row(result);
+	if(row==NULL){
+		return 0;
+	} else {
+		sprintf(*data,"{\"planid\":\"%s\",\"name\":\"%s\",\"status\":\"%s\"}",row[0],row[1],row[2]);
+		size = strlen(*data) + 1;
+		*data = (char *) realloc(*data,size);
+		return 1;
+	}
+}
+
+
 int json_user_show(char **data, MYSQL_RES *result){
 
 	MYSQL_ROW row;
@@ -111,26 +153,30 @@ int json_susc_list(char **data, MYSQL_RES *result){
 
 	MYSQL_ROW row;
 	int size=0;
-	int a;
+	int a=0;
 	
 	size = size + 100;
 	*data = (char *) realloc(*data,size);
 	strcpy(*data,"{\"code\":\"200\",\"info\":[");
-	printf("Al menos aca %p\n",result);
 	while ((row = mysql_fetch_row(result))){
 		a++;
-		printf("ROW: %p\n",row);
 		if((80 + strlen(*data)) > size){
 			size = size + 100;
 			*data = (char *) realloc(*data,size);
 		}
-		printf("Utilizamos el sprintf\n");
 		sprintf(*data,"%s{\"id\":\"%s\",\"name\":\"%s\",\"plan_name\":\"%s\"},",*data,row[0],row[1],row[2]);
+	}
+	/* Hay que agregar en el peor de los casos dos caracteres mas que son el cierre del listado "]"
+ 	   y el cierrre de la estructura "}" */
+	if((strlen(*data) + 2) > size){
+		size = size + 2;
+		*data = (char *) realloc(*data,size);
 	}
 	if(a)
 		(*data)[strlen(*data)-1] = ']';
 	else
 		strcat(*data,"]");
+	strcat(*data,"}");
 }
 
 int json_susc_show(char **message, MYSQL_RES *result){

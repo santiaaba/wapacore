@@ -208,6 +208,42 @@ int db_user_show(T_db *db, T_dictionary *d, MYSQL_RES **result, char *error, int
 	}
 }
 
+
+int db_plan_list(T_db *db, MYSQL_RES **result){
+
+	mysql_query(db->con,"select id,name,status from plan");
+	if(mysql_errno(db->con)){
+		return 0;
+	}
+	*result = mysql_store_result(db->con);
+	return 1;
+}
+
+int db_plan_show(T_db *db, T_dictionary *d, MYSQL_RES **result, char *error, int *db_fail){
+	/* Retorna los datos de un plan basado en el id.
+ 	   Si el usuario no existe retorna 0. Sino retorna 1. */
+	char sql[100];
+
+	dictionary_print(d);
+	printf("Buscando plan %s\n",dictionary_get(d,"plan_id"));
+	sprintf(sql,"select id,name,status from plan where id=%s", dictionary_get(d,"plan_id"));
+	mysql_query(db->con,sql);
+	if(mysql_errno(db->con)){
+		*db_fail = 1;
+		return 0;
+	}
+	*db_fail = 0;
+	*result = mysql_store_result(db->con);
+	if(mysql_num_rows(*result))
+		return 1;
+	else {
+		sprintf(error,"{\"code\":\"320\",\"info\":\"Plan inexistente\"}");
+		return 0;
+	}
+}
+
+
+
 int db_susc_show(T_db *db, T_dictionary *d, char **data, char *error, int *db_fail){
 	/* Retorna datos de la suscripcion en base al susc_id. Si no existe
  	   retorna 0. Si existe retorna 1. */

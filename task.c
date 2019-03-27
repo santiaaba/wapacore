@@ -502,6 +502,44 @@ void task_susc_start(T_task *t, T_db *db,T_list_cloud *cl){
 	}
 }
 
+/*************	TASK PLAN  ***********************/
+
+void task_plan_list(T_task *t, T_db *db){
+	/* Obtiene el listado de planes */
+	MYSQL_RES *db_r;
+	char *aux=NULL;
+
+	logs_write(t->logs,L_DEBUG,"task_plan_list","");
+	if(!db_plan_list(db,&db_r)){
+		logs_write(t->logs,L_ERROR,"DB ERROR","");
+		task_done(t,ERROR_FATAL);
+	} else {
+		json_plan_list(&aux,db_r);
+		task_done(t,aux);
+	}
+	free(aux);
+}
+
+void task_plan_show(T_task *t, T_db *db){
+	/* Obtiene la informacion de un plan */
+	MYSQL_RES *db_r;
+	char *aux=NULL;
+	char error[200];
+	int db_fail;
+
+	if(!db_plan_show(db,t->data,&db_r,error,&db_fail)){
+		if(db_fail)
+			task_done(t,ERROR_FATAL);
+		else
+			task_done(t,error);
+	} else {
+		json_plan_show(&aux,db_r);
+		task_done(t,aux);
+	}
+	free(aux);
+}
+
+
 
 /*************	TASK USER  ***********************/
 
@@ -797,7 +835,6 @@ int task_cloud_get(T_task *t){
 			code[3] = '\0';
 			s = (char *)malloc(sizeof(char) * (strlen(rcv_message) + 21));  //me excedo un poco. No importa
 			sprintf(s,"{\"code\":\"%s\",\"info\":%s}",code,rcv_message+5);
-			printf("AAAAA---%s---BBBBB\n",s);
 			task_done(t,s);
 		} else {
 			/* deberia ser un 2. Entonces task no existe en la nube */
@@ -1167,6 +1204,10 @@ void task_run(T_task *t, T_db *db, T_list_cloud *cl){
 			case T_USER_DEL:	task_user_del(t,db,cl); break;
 			case T_USER_STOP:	task_user_stop(t,db,cl); break;
 			case T_USER_START:	task_user_start(t,db,cl); break;
+
+			/* PLANES */
+			case T_PLAN_LIST:	task_plan_list(t,db); break;
+			case T_PLAN_SHOW:	task_plan_show(t,db); break;
 	
 			/* SUSCRIPTION */
 			case T_SUSC_LIST:	task_susc_list(t,db); break;
@@ -1189,12 +1230,16 @@ void task_run(T_task *t, T_db *db, T_list_cloud *cl){
 			case T_HW_SITE_LIST:task_hw_site_list(t,cl); break;
 		}
 	} else {
+		printf("ACCIONES SOBRE UNA NUBE\n");
 		/* Son acciones sobre alguna nube */
 		if(t->cloud == NULL){
 			/* Averiguamos la nube */
-			if( t->type <= T_HW_SERVER_START){
+			printf("AVERIGUAMOS LA NUBE\n");
+			if( t->type <= T_FTP_MOD){
 				/* Acciones sobre una nube web */
+				printf("LA NUBE ES WEB\n");
 				valor = dictionary_get(t->data,"susc_id");
+				printf("SUSC_ID=%s\n",valor);
 				//strcpy(plan_id,"0");	//BUSCAR EL PLAN ID CORRESPONDIENTE AL SUSCRIPTION ID
 				if(! db_get_cloud_id(db,valor,C_WEB,&cloud_id,error,&db_fail)){
 					if(db_fail)
