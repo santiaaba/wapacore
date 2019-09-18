@@ -58,7 +58,7 @@ int json_cloud_show(char **data, char *id, T_list_cloud *cl){
 	printf("QUE paso con c: %p\n",c);
 	if(c){
 		*data = (char *) realloc(*data,200);
-		sprintf(*data,"{\"id\":%s,\"name\":\"%s\",\"type\":%i,\"status\":%i},",
+		sprintf(*data,"{\"id\":%s,\"name\":\"%s\",\"type\":%i,\"status\":%i}",
 			id,cloud_get_name(c),cloud_get_type(c),cloud_get_status(c));
 		return 1;
 	} else {
@@ -164,7 +164,7 @@ int json_susc_list(char **data, MYSQL_RES *result){
 			size = size + 100;
 			*data = (char *) realloc(*data,size);
 		}
-		sprintf(*data,"%s{\"id\":\"%s\",\"name\":\"%s\",\"plan_name\":\"%s\"},",*data,row[0],row[1],row[2]);
+		sprintf(*data,"%s{\"id\":\"%s\",\"name\":\"%s\",\"plan_name\":\"%s\",\"status\":\"%s\"},",*data,row[0],row[1],row[2],row[3]);
 	}
 	/* Hay que agregar en el peor de los casos dos caracteres mas que son el cierre del listado "]"
  	   y el cierrre de la estructura "}" */

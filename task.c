@@ -757,7 +757,7 @@ void task_cloud_show(T_task *t, T_list_cloud *cl){
 	/* Retorna el estado de una nube en particular */
 	/* Los datos podemos tomarlos directamente de la estructura */
 
-	char *aux;
+	char *aux=NULL;
 
 	if(json_cloud_show(&aux,dictionary_get(t->data,"cloud_id"),cl)){
 		task_done(t,aux);

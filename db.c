@@ -284,7 +284,7 @@ int db_susc_list(T_db *db, T_dictionary *d, MYSQL_RES **result, char *error, int
 	char sql[150];
 
 	if(db_user_exist(db,d,error,db_fail)){
-		sprintf(sql,"select s.id, s.name, p.name as plan_name from suscription s inner join plan p on (s.plan_id = p.id) where user_id=%s", dictionary_get(d,"user_id"));
+		sprintf(sql,"select s.id, s.name, p.name as plan_name, s.status from suscription s inner join plan p on (s.plan_id = p.id) where user_id=%s", dictionary_get(d,"user_id"));
 		mysql_query(db->con,sql);
 		if(mysql_errno(db->con)){
 			*db_fail = 1;
