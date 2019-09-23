@@ -13,7 +13,7 @@ int json_user_list(char **data, MYSQL_RES *result);
 int json_user_show(char **data, MYSQL_RES *result);
 
 int json_plan_list(char **data, MYSQL_RES *result);
-int json_plan_show(char **data, MYSQL_RES *result);
+int json_plan_show(char **data, MYSQL_RES *result, MYSQL_RES *nubes);
 
 int json_cloud_list(char **data, MYSQL_RES *result, T_list_cloud *cl);
 int json_cloud_show(char **data, char *id, T_list_cloud *cl);

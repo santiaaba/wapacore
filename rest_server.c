@@ -1,5 +1,10 @@
 #include "rest_server.h"
 
+int check_login(T_dictionary *data, char *result){
+	/* De momento retorna siempre 1 */
+        return 1;
+}
+
 int check_plan_add(T_dictionary *data, char *result){
 	CHECK_VALID_ID(plan_id,plan)
 	return 1;
@@ -299,8 +304,19 @@ static int handle_POST(struct MHD_Connection *connection,
 	task = (T_task *)malloc(sizeof(T_task));
 	task_init(task,&token,con_info->data,&logs);
 
+	/* PARA LOGIN */
+	if(0 == strcmp("login",value)){
+		parce_data((char *)url,'/',&pos,value);
+		if(strlen(value)>0){
+			ok=0;
+			rest_server_url_error(result,&ok);
+		} else {
+			if(ok = check_login(con_info->data,result)){
+				task_set_type(task,T_LOGIN);
+			}
+		}
 	/* PARA LOS PLANES */
-	if(0 == strcmp("plans",value)){
+	} else if(0 == strcmp("plans",value)){
 		parce_data((char *)url,'/',&pos,value);
 		if(strlen(value)>0){
 			ok=0;

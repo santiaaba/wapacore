@@ -21,6 +21,10 @@
 
 typedef enum {	
 	T_NONE,
+
+	/* LOGIN */
+	T_LOGIN,
+
 	/* CLOUDS */
 	T_CLOUD_LIST,
 	T_CLOUD_SHOW,

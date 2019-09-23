@@ -32,6 +32,9 @@ int db_live(T_db *db);
 int db_load_clouds(T_db *db, T_list_cloud *clouds);
 int db_get_cloud_id(T_db *db, char *susc_id, T_cloud_type t, int *cloud_id, char *error, int *db_fail);
 
+/* LOGIN */
+int db_login(T_db *db, T_dictionary *d, char *error, int *db_fail);
+
 /* NUBES */
 int db_cloud_list(T_db *db, MYSQL_RES **result);
 
@@ -46,7 +49,7 @@ int db_user_start(T_db *db, T_dictionary *d, char *error, int *db_fail);
 
 /* PLAN */
 int db_plan_list(T_db *db, MYSQL_RES **result);
-int db_plan_show(T_db *db, T_dictionary *d, MYSQL_RES **result, char *error, int *db_fail);
+int db_plan_show(T_db *db, T_dictionary *d, MYSQL_RES **result, MYSQL_RES **nubes, char *error, int *db_fail);
 
 /* SUSCRIPTION */
 int db_susc_prepare(T_db *db, T_dictionary *d, int action);

@@ -50,6 +50,25 @@ int db_live(T_db *db){
 	//mysql_free_result(db->con);
 }
 
+int db_login(T_db *db, T_dictionary *d, char *error, int *db_fail){
+	MYSQL_ROW row;
+	char sql[200];
+	
+	sprintf(sql,"select count(*) as cantidad from user where name=\"%s\" and pass=\"%s\"",dictionary_get(d,"user"),dictionary_get(d,"pass"));
+	if(mysql_query(db->con,sql)){
+                *db_fail = 1;
+                return 0;
+        }
+	*db_fail = 0;
+	MYSQL_RES *result = mysql_store_result(db->con);
+	if((mysql_num_rows(result) == 1)){
+		return 1;
+	} else {
+		sprintf(error,"{\"code\":\"350\",\"info\":\"Eror Login\"}");
+		return 0;
+	}
+}
+
 int db_load_clouds(T_db *db, T_list_cloud *clouds){
 	/* Levanta las nubes de la base de datos
  	   retorna 0 si no pudo a causa de algun error */
@@ -219,24 +238,39 @@ int db_plan_list(T_db *db, MYSQL_RES **result){
 	return 1;
 }
 
-int db_plan_show(T_db *db, T_dictionary *d, MYSQL_RES **result, char *error, int *db_fail){
+int db_plan_show(T_db *db, T_dictionary *d, MYSQL_RES **result, MYSQL_RES **nubes, char *error, int *db_fail){
 	/* Retorna los datos de un plan basado en el id.
  	   Si el usuario no existe retorna 0. Sino retorna 1. */
-	char sql[100];
+	char sql[300];
 
 	dictionary_print(d);
 	printf("Buscando plan %s\n",dictionary_get(d,"plan_id"));
 	sprintf(sql,"select id,name,status from plan where id=%s", dictionary_get(d,"plan_id"));
 	mysql_query(db->con,sql);
+	printf("Obtuvimos error: %i\n",mysql_errno(db->con));
 	if(mysql_errno(db->con)){
 		*db_fail = 1;
 		return 0;
 	}
-	*db_fail = 0;
 	*result = mysql_store_result(db->con);
-	if(mysql_num_rows(*result))
-		return 1;
-	else {
+	*db_fail = 0;
+	if(mysql_num_rows(*result)){
+		/* Buscamos el listado de nubes */
+		printf("Buscando nubes del plan\n");
+		sprintf(sql,"select id, name, tipo from (select n.id as id, n.name as name, n.tipo as tipo from nube n inner join plan_web p on (p.id_nube = n.id) where p.id = %s union all select n.id as id, n.name as name, n.tipo as tipo from nube n inner join plan_mysql p on (p.id_nube = n.id) where p.id = %s) nubes;",dictionary_get(d,"plan_id"),dictionary_get(d,"plan_id"));
+		mysql_query(db->con,sql);
+		if(mysql_errno(db->con)){
+			*db_fail = 1;
+			return 0;
+		}
+		*nubes = mysql_store_result(db->con);
+		if(mysql_num_rows(*result)){
+			return 1;
+		} else {
+			sprintf(error,"{\"code\":\"320\",\"info\":\"ERROR: Plan no tiene nubes\"}");
+			return 0;
+		};
+	} else {
 		sprintf(error,"{\"code\":\"320\",\"info\":\"Plan inexistente\"}");
 		return 0;
 	}
@@ -284,7 +318,7 @@ int db_susc_list(T_db *db, T_dictionary *d, MYSQL_RES **result, char *error, int
 	char sql[150];
 
 	if(db_user_exist(db,d,error,db_fail)){
-		sprintf(sql,"select s.id, s.name, p.name as plan_name, s.status from suscription s inner join plan p on (s.plan_id = p.id) where user_id=%s", dictionary_get(d,"user_id"));
+		sprintf(sql,"select s.id, s.name, p.name as plan_name, s.status, p.id as plan_id from suscription s inner join plan p on (s.plan_id = p.id) where user_id=%s", dictionary_get(d,"user_id"));
 		mysql_query(db->con,sql);
 		if(mysql_errno(db->con)){
 			*db_fail = 1;

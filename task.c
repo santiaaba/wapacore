@@ -106,6 +106,23 @@ int task_assign_cloud(T_task *t, T_list_cloud *cl){
 	return (t->cloud != NULL);
 }
 
+int task_login(T_task *t, T_db *db){
+	/* Autentica un usuario y le retorna un token */
+	int db_fail;
+	char error[200];
+	char token[100] = "fijodemomento";
+
+	if(!db_login(db,t->data,error,&db_fail)){
+		if(db_fail)
+			task_done(t,ERROR_FATAL);
+		else
+			task_done(t,error);
+	}
+	/* Generamos un token de forma random */
+	sprintf(error,"{\"code\":\"200\",\"token\":\"%s\"}",token);
+	task_done(t,error);
+}
+
 /*************	TASK SUSCRIPT  ***********************/
 
 int task_susc_add(T_task *t, T_db *db, T_list_cloud *cl){
@@ -522,18 +539,19 @@ void task_plan_list(T_task *t, T_db *db){
 
 void task_plan_show(T_task *t, T_db *db){
 	/* Obtiene la informacion de un plan */
-	MYSQL_RES *db_r;
+	MYSQL_RES *db_r;	//retorna datos del plan
+	MYSQL_RES *db_r2;	//retorna listado de nubes que posee el plan
 	char *aux=NULL;
 	char error[200];
 	int db_fail;
 
-	if(!db_plan_show(db,t->data,&db_r,error,&db_fail)){
+	if(!db_plan_show(db,t->data,&db_r,&db_r2,error,&db_fail)){
 		if(db_fail)
 			task_done(t,ERROR_FATAL);
 		else
 			task_done(t,error);
 	} else {
-		json_plan_show(&aux,db_r);
+		json_plan_show(&aux,db_r,db_r2);
 		task_done(t,aux);
 	}
 	free(aux);
@@ -1196,6 +1214,8 @@ void task_run(T_task *t, T_db *db, T_list_cloud *cl){
 	if(t->type <= T_SUSC_START ){
 		/* No son acciones sobre una nube directa */
 		switch(t->type){
+			/* lOGIN */
+			case T_LOGIN:		task_login(t,db); break;
 			/* USERS */
 			case T_USER_LIST:	task_user_list(t,db); break;
 			case T_USER_SHOW:	task_user_show(t,db); break;

@@ -99,17 +99,36 @@ int json_cloud_list(char **data, MYSQL_RES *result, T_list_cloud *cl){
 	return 1;
 }
 
-int json_plan_show(char **data, MYSQL_RES *result){
+int json_plan_show(char **data, MYSQL_RES *result, MYSQL_RES *nubes){
 
 	MYSQL_ROW row;
+	char *jsonNubes;
+	int size_nubes = 100;
+	int a=0;
 	int size=1000;	//Deberian entrar todos los datos. Sino ampliar 
 
-	*data = (char *) realloc(*data,size);
+	/* Armamos el json del listado de nubes */
+	jsonNubes = (char *) malloc(size_nubes);
+	strcpy(jsonNubes,"[");
+	while ((row = mysql_fetch_row(nubes))){
+		a++;
+		if((strlen(jsonNubes)) + 100 > size_nubes){
+			size_nubes = size_nubes + 100;
+			jsonNubes = (char *) realloc(jsonNubes,size_nubes);
+		}
+		sprintf(jsonNubes,"%s{\"id\":\"%s\",\"nombre\":\"%s\",\"tipo\":\"%s\"},",jsonNubes,row[0],row[1],row[2]);
+	}
+	if(a)
+		(jsonNubes)[strlen(jsonNubes)-1] = ']';
+	else
+		strcat(jsonNubes,"]");
+
+	*data = (char *) realloc(*data,size + strlen(jsonNubes));
 	row = mysql_fetch_row(result);
 	if(row==NULL){
 		return 0;
 	} else {
-		sprintf(*data,"{\"planid\":\"%s\",\"name\":\"%s\",\"status\":\"%s\"}",row[0],row[1],row[2]);
+		sprintf(*data,"{\"planid\":\"%s\",\"name\":\"%s\",\"status\":\"%s\",\"nubes\":%s}",row[0],row[1],row[2],jsonNubes);
 		size = strlen(*data) + 1;
 		*data = (char *) realloc(*data,size);
 		return 1;
@@ -164,7 +183,7 @@ int json_susc_list(char **data, MYSQL_RES *result){
 			size = size + 100;
 			*data = (char *) realloc(*data,size);
 		}
-		sprintf(*data,"%s{\"id\":\"%s\",\"name\":\"%s\",\"plan_name\":\"%s\",\"status\":\"%s\"},",*data,row[0],row[1],row[2],row[3]);
+		sprintf(*data,"%s{\"id\":\"%s\",\"name\":\"%s\",\"plan_name\":\"%s\",\"status\":\"%s\",\"plan_id\":\"%s\"},",*data,row[0],row[1],row[2],row[3],row[4]);
 	}
 	/* Hay que agregar en el peor de los casos dos caracteres mas que son el cierre del listado "]"
  	   y el cierrre de la estructura "}" */
